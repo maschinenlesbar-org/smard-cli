@@ -50,13 +50,16 @@ that file. The `latest` command does that for you in one call.
 | Option | Description |
 | --- | --- |
 | `--base-url <url>` | API base URL (default `https://www.smard.de`) |
-| `--timeout <ms>` | Per-request timeout (default `30000`) |
+| `--timeout <ms>` | Per-request timeout (default `30000`; `0` = no timeout) |
 | `--user-agent <ua>` | `User-Agent` header value |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (default `2`) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 | `--compact` | Print JSON on a single line |
 
-Global options go **before** the command, e.g. `smard --compact latest 410 DE hour`.
+Global options may be passed **before or after** the command (commander resolves
+them either way), e.g. `smard --compact latest 410 DE hour` or
+`smard latest 410 DE hour --compact`. Placing them before the command is the
+conventional, recommended position.
 
 ### Commands
 
@@ -64,11 +67,17 @@ Global options go **before** the command, e.g. `smard --compact latest 410 DE ho
 timestamps <filter> <region> <resolution>              available window timestamps
 series     <filter> <region> <resolution> <timestamp>  one window's data
 latest     <filter> <region> <resolution>              newest window's data (one call)
-table      <filter> <region> <timestamp>               quarter-hour table_data
+table      <filter> <region> <timestamp>               quarter-hour table_data (see note)
 filters    [--group generation|consumption|price|forecast]   filter catalogue
 regions                                                 valid region codes
 resolutions                                             valid resolution values
 ```
+
+> **Note on `table` timestamps:** the `table` command reads from `table_data`,
+> whose valid window timestamps are **not** the same set returned by the
+> `timestamps` command (which lists `chart_data` windows). There is no discovery
+> endpoint for `table_data` timestamps in the public API, so a `table` call may
+> `404` for a timestamp that is valid for `series`/`latest`.
 
 ### Examples
 
@@ -82,9 +91,11 @@ smard latest 410 DE week
 # Newest hour-resolution photovoltaic generation, compact
 smard --compact latest 4068 DE hour
 
-# Pick a specific window explicitly
-smard timestamps 4169 DE-LU hour          # -> [ ..., 1577836800000 ]
-smard series 4169 DE-LU hour 1577836800000
+# Pick a specific window explicitly. The available timestamps roll over time, so
+# read one from `timestamps` rather than hard-coding a value (older windows 404).
+smard timestamps 4169 DE-LU hour          # -> [ ..., <some valid timestamp> ]
+TS=$(smard --compact timestamps 4169 DE-LU hour | python3 -c 'import json,sys; print(json.load(sys.stdin)[-1])')
+smard series 4169 DE-LU hour "$TS"
 ```
 
 Exit codes: `0` success, `4` on a `404` from the API, `1` for any other error,
@@ -141,6 +152,13 @@ The `FILTERS` array and the `RegionValues` / `ResolutionValues` enums are export
 > The `Region` / `Resolution` types are compile-time hints only; an arbitrary
 > string cast to `Region` is merely `encodeURIComponent`-escaped, not checked
 > against `RegionValues`. Validate untrusted input yourself before calling.
+>
+> Likewise, the **response** types (`SeriesResult` / `TableResult`) are a typed
+> **pass-through**: any successful (2xx) JSON body is parsed and returned cast to
+> the method's return type without structural validation. The one exception is
+> `timestamps()`, which validates that `timestamps` is an array (else throws
+> `SmardParseError`). For `series` / `latest` / `tableData`, treat the typing as a
+> convenience over the documented API shape, not a runtime guarantee.
 
 ---
 

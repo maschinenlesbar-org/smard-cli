@@ -53,9 +53,14 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
-    this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    // Treat an empty/blank base URL as "use the default" rather than building
+    // relative URLs that later fail with an opaque "Invalid URL".
+    const baseUrl = options.baseUrl?.trim() ? options.baseUrl : DEFAULT_BASE_URL;
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.transport = options.transport ?? nodeHttpTransport;
-    this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT;
+    // Treat an empty/blank User-Agent as "use the default": some endpoints serve
+    // an HTML challenge page (not JSON) when no User-Agent is sent.
+    this.userAgent = options.userAgent?.trim() ? options.userAgent : DEFAULT_USER_AGENT;
     this.timeoutMs = options.timeoutMs ?? 30_000;
     this.maxRetries = options.maxRetries ?? 2;
     this.retryDelayMs = options.retryDelayMs ?? 200;

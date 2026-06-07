@@ -29,9 +29,9 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     )
     .version(VERSION)
     .option("--base-url <url>", "API base URL", "https://www.smard.de")
-    .option("--timeout <ms>", "per-request timeout in milliseconds", parseIntArg)
+    .option("--timeout <ms>", "per-request timeout in milliseconds (0 = no timeout)", parseIntArg, 30_000)
     .option("--user-agent <ua>", "User-Agent header value")
-    .option("--max-retries <n>", "retries for transient 429/503 responses", parseIntArg)
+    .option("--max-retries <n>", "retries for transient 429/503 responses", parseIntArg, 2)
     .option(
       "--max-response-bytes <n>",
       "cap response body size in bytes (0 = unlimited; default 100 MiB)",

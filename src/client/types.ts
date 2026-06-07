@@ -29,14 +29,31 @@ export interface SeriesResult {
   series: SeriesPoint[];
 }
 
+/**
+ * One versioned value of a `table_data` point. `name` identifies the data
+ * version and is a number at runtime (not a label string).
+ */
+export interface TableVersion {
+  value: number | null;
+  name: number | null;
+}
+
 /** A point of the quarter-hour `table_data` response. */
 export interface TablePoint {
   timestamp: number;
-  versions: { value: number | null; name: string | null }[];
+  versions: TableVersion[];
+}
+
+/**
+ * One entry of a `table_data` `series`. The API nests the actual points under a
+ * `values` array rather than exposing `{timestamp, versions}` directly.
+ */
+export interface TableSeriesEntry {
+  values: TablePoint[];
 }
 
 /** Response of a `table_data` request. */
 export interface TableResult {
   meta_data: SeriesMetaData;
-  series: TablePoint[];
+  series: TableSeriesEntry[];
 }

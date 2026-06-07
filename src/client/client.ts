@@ -14,6 +14,7 @@
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { Region, Resolution } from "./enums.js";
 import type { TimestampIndex, SeriesResult, TableResult } from "./types.js";
+import { SmardParseError } from "./errors.js";
 
 const enc = encodeURIComponent;
 
@@ -26,10 +27,16 @@ export class SmardClient {
 
   /** The timestamps (window starts) available for a (filter, region, resolution). */
   async timestamps(filter: number, region: Region, resolution: Resolution): Promise<number[]> {
-    const res = await this.engine.getJson<TimestampIndex>(
-      `/app/chart_data/${filter}/${enc(region)}/index_${resolution}.json`,
-    );
-    return res.timestamps ?? [];
+    const path = `/app/chart_data/${filter}/${enc(region)}/index_${resolution}.json`;
+    const res = await this.engine.getJson<TimestampIndex>(path);
+    const ts = res?.timestamps;
+    if (ts === undefined || ts === null) return [];
+    if (!Array.isArray(ts)) {
+      throw new SmardParseError(
+        `Malformed index from ${path}: "timestamps" is not an array.`,
+      );
+    }
+    return ts;
   }
 
   /** The data file for one window, identified by its timestamp. */
@@ -51,7 +58,9 @@ export class SmardClient {
       return { meta_data: { version: 0, created: 0 }, series: [] };
     }
     // Take the genuinely newest timestamp rather than trusting the index order.
-    const newest = Math.max(...ts);
+    // Use a reduce rather than `Math.max(...ts)`: spreading a very large index as
+    // function arguments overflows the call stack (RangeError).
+    const newest = ts.reduce((max, t) => (t > max ? t : max), ts[0]!);
     return this.series(filter, region, resolution, newest);
   }
 

@@ -45,5 +45,13 @@ export class SmardApiError extends SmardError {
 /** A transport-level failure (DNS, connection reset, timeout, ...). */
 export class SmardNetworkError extends SmardError {}
 
+/**
+ * The response body exceeded the configured `maxResponseBytes` cap and the
+ * request was aborted. A subclass of `SmardNetworkError` so it still collapses to
+ * the documented exit code 1, but a distinct type so library callers can tell a
+ * size-cap breach apart from a genuine connection failure.
+ */
+export class SmardResponseTooLargeError extends SmardNetworkError {}
+
 /** The response body could not be parsed as the expected JSON shape. */
 export class SmardParseError extends SmardError {}

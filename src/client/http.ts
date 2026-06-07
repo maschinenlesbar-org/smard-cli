@@ -8,7 +8,7 @@
 
 import http from "node:http";
 import https from "node:https";
-import { SmardNetworkError } from "./errors.js";
+import { SmardNetworkError, SmardResponseTooLargeError } from "./errors.js";
 
 export interface HttpRequest {
   method: string;
@@ -75,7 +75,7 @@ export const nodeHttpTransport: Transport = (request) =>
           if (maxBytes !== undefined && received > maxBytes) {
             aborted = true;
             res.destroy();
-            reject(new SmardNetworkError(`Response exceeded maxResponseBytes (${maxBytes})`));
+            reject(new SmardResponseTooLargeError(`Response exceeded maxResponseBytes (${maxBytes})`));
             return;
           }
           chunks.push(chunk);

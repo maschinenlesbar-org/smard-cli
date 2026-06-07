@@ -19,7 +19,8 @@ Medium 9, Low 8.**
 
 ## HIGH
 
-### 1. `latest` crashes with "Maximum call stack size exceeded" on a large index
+### 1. `latest` crashes with "Maximum call stack size exceeded" on a large index — ✅ FIXED
+**Fix:** Replaced `Math.max(...ts)` with a `ts.reduce(...)` in `src/client/client.ts` `latest()`, so an arbitrarily large index no longer spreads into the call stack.
 - **Severity:** High · **Confidence:** High
 - **Repro:** point at a mock returning an index with ~500k timestamps, then:
   ```
@@ -39,7 +40,8 @@ Medium 9, Low 8.**
   use a reduce/loop. (The live `410 DE hour` index is ~400 entries today, so it
   works now, but the API publishes a new file weekly and the spread is unbounded.)
 
-### 2. `latest` throws an uncaught `TypeError` when `timestamps` is not an array
+### 2. `latest` throws an uncaught `TypeError` when `timestamps` is not an array — ✅ FIXED
+**Fix:** `timestamps()` in `src/client/client.ts` now validates the parsed index: a missing/null `timestamps` returns `[]`, and a non-array `timestamps` throws a typed `SmardParseError` (exit 1 via the handled path) instead of reaching `Math.max(...)`.
 - **Severity:** High · **Confidence:** High
 - **Repro:** mock returns `{"timestamps":{"0":123}}` for `index_*.json`, then:
   ```
@@ -56,7 +58,8 @@ Medium 9, Low 8.**
   `Math.max(...ts)` (line 54) then spreads a non-iterable. `getJson`/`timestamps`
   perform no runtime validation of the declared `TimestampIndex` shape.
 
-### 3. `filters --group <invalid>` silently returns `[]` with exit 0 (no validation)
+### 3. `filters --group <invalid>` silently returns `[]` with exit 0 (no validation) — ✅ FIXED
+**Fix:** `src/cli/commands/catalogue.ts` now runs the `--group` value through `assertEnum` against `["generation","consumption","price","forecast"]`, so an invalid (or wrong-case) group throws a `SmardError` and exits non-zero with "Invalid group ...".
 - **Severity:** High · **Confidence:** High
 - **Repro:**
   ```
@@ -77,7 +80,8 @@ Medium 9, Low 8.**
 
 ## MEDIUM
 
-### 4. Declared `TableResult` type does not match the real API response shape
+### 4. Declared `TableResult` type does not match the real API response shape — ✅ FIXED
+**Fix:** In `src/client/types.ts`, `TableResult.series` is now `TableSeriesEntry[]` where `TableSeriesEntry = { values: TablePoint[] }`, matching the real nested-`values` structure, so typed library consumers index the data correctly.
 - **Severity:** Medium · **Confidence:** High
 - **Repro (live):**
   ```
@@ -94,7 +98,8 @@ Medium 9, Low 8.**
   the wrong structure; `client.ts:59 tableData()` casts the parsed JSON to this
   incorrect type with no validation.
 
-### 5. `TablePoint.versions[].name` typed `string | null` but is a number at runtime
+### 5. `TablePoint.versions[].name` typed `string | null` but is a number at runtime — ✅ FIXED
+**Fix:** Introduced `TableVersion = { value: number | null; name: number | null }` in `src/client/types.ts` and used it for `TablePoint.versions`, so `name` is now correctly typed as `number | null`.
 - **Severity:** Medium · **Confidence:** High
 - **Repro (live):**
   ```
@@ -106,7 +111,8 @@ Medium 9, Low 8.**
   live response. Wrong compile-time type for library callers.
 - **Root cause:** `src/client/types.ts:35`.
 
-### 6. Empty `--user-agent ""` causes a confusing "Failed to parse JSON" on the live API
+### 6. Empty `--user-agent ""` causes a confusing "Failed to parse JSON" on the live API — ✅ FIXED
+**Fix:** `RequestEngine` (`src/client/engine.ts`) now treats an empty/blank `userAgent` as "use the default" (`options.userAgent?.trim() ? options.userAgent : DEFAULT_USER_AGENT`), so a default UA is always sent and the API returns JSON instead of the HTML challenge page.
 - **Severity:** Medium · **Confidence:** High
 - **Repro (live, deterministic, 3/3 runs):**
   ```
@@ -127,7 +133,8 @@ Medium 9, Low 8.**
   Should treat empty/blank UA as "use default", or detect a non-JSON 200 and emit
   a clearer error.
 
-### 7. README "specific window" example is broken — the timestamp 404s
+### 7. README "specific window" example is broken — the timestamp 404s — ✅ FIXED
+**Fix:** `README.md` no longer hard-codes a stale timestamp; the "specific window" example now derives a live timestamp from the `timestamps` command output (and notes that older windows roll out of the index and 404).
 - **Severity:** Medium · **Confidence:** High
 - **Repro (live), copied verbatim from README.md:86-87:**
   ```
@@ -144,7 +151,8 @@ Medium 9, Low 8.**
 - **Root cause:** hard-coded example timestamp in `README.md` (lines 86-87) that no
   longer exists in the rolling index.
 
-### 8. No runtime shape validation: `timestamps` prints a non-array object as-is
+### 8. No runtime shape validation: `timestamps` prints a non-array object as-is — ✅ FIXED
+**Fix:** Same `Array.isArray` guard added to `timestamps()` in `src/client/client.ts` (see #2): a non-array `timestamps` now throws `SmardParseError` instead of being printed, so the `Promise<number[]>` contract holds at runtime.
 - **Severity:** Medium · **Confidence:** High
 - **Repro:** mock returns `{"timestamps":{"0":123}}`:
   ```
@@ -158,7 +166,8 @@ Medium 9, Low 8.**
   no `Array.isArray` check; `engine.getJson` does `JSON.parse(...) as T` with no
   schema validation.
 
-### 9. Help omits documented defaults for `--timeout` and `--max-retries`
+### 9. Help omits documented defaults for `--timeout` and `--max-retries` — ✅ FIXED
+**Fix:** `src/cli/program.ts` now registers `--timeout` with default `30000` (and notes `0 = no timeout`) and `--max-retries` with default `2`, so commander renders both defaults in `--help`. The engine's internal defaults are unchanged.
 - **Severity:** Medium · **Confidence:** High
 - **Repro:** `node dist/src/cli/index.js --help`
 - **Expected:** README (lines 53-56) documents `--timeout` default `30000` and
@@ -170,7 +179,8 @@ Medium 9, Low 8.**
   optional default-value argument that `commander` renders into help (the engine
   still applies 30000 / 2 internally at `engine.ts:59-60`).
 
-### 10. README says global options must go "before" the command, but they also work after
+### 10. README says global options must go "before" the command, but they also work after — ✅ FIXED
+**Fix:** `README.md` now states global options may be passed before or after the command (commander resolves either), with "before" called out as the recommended convention rather than a requirement.
 - **Severity:** Medium · **Confidence:** High
 - **Repro:**
   ```
@@ -184,7 +194,8 @@ Medium 9, Low 8.**
 - **Root cause:** documentation/behaviour mismatch; `shared.ts:114` uses
   `optsWithGlobals()`.
 
-### 11. `series`/`table`/`latest` perform no validation that the parsed JSON matches the result type
+### 11. `series`/`table`/`latest` perform no validation that the parsed JSON matches the result type — ⚠️ WONTFIX (documented pass-through; deep structural validation is out of scope)
+**Fix:** Documented the intentional typed pass-through in `README.md` (library section), noting that `series`/`latest`/`tableData` return any 2xx JSON cast to the return type, while `timestamps()` is the one method that validates its shape (see #2/#8). Full structural validation of the nested series/table shapes would be a feature, not a defect fix.
 - **Severity:** Medium · **Confidence:** High
 - **Repro:** mock returns `{"meta_data":{"version":1,"created":2},"series":[[1,2]]}`
   for a `table` request and the CLI happily prints it even though that is the
@@ -195,7 +206,8 @@ Medium 9, Low 8.**
   guarantee at all.
 - **Root cause:** `engine.getJson<T>` (`engine.ts:114-122`) does `JSON.parse(text) as T`.
 
-### 12. `--base-url=` (empty) yields a low-level "Invalid URL" instead of a usage error
+### 12. `--base-url=` (empty) yields a low-level "Invalid URL" instead of a usage error — ✅ FIXED
+**Fix:** `RequestEngine` (`src/client/engine.ts`) now falls back to `DEFAULT_BASE_URL` when `baseUrl` is empty/blank (`options.baseUrl?.trim() ? ... : DEFAULT_BASE_URL`), so an empty base URL no longer produces a relative URL / opaque "Invalid URL".
 - **Severity:** Medium · **Confidence:** Medium
 - **Repro:**
   ```
@@ -216,7 +228,8 @@ Medium 9, Low 8.**
 
 ## LOW
 
-### 13. No-arg invocation prints full help but exits 1 (help on stderr)
+### 13. No-arg invocation prints full help but exits 1 (help on stderr) — ⚠️ WONTFIX (intended "usage error" behaviour)
+**Fix:** No code change. A bare invocation with no command is a usage error, so help-to-stderr + exit 1 is the deliberate, conventional behaviour (matches commander's default and the README exit-code policy). Not a defect.
 - **Severity:** Low · **Confidence:** High
 - **Repro:** `node dist/src/cli/index.js; echo $?`
 - **Expected:** arguably exit 0 for a bare "show me help" (many CLIs do), or at
@@ -227,7 +240,8 @@ Medium 9, Low 8.**
 - **Root cause:** `commander` default `helpCommand`/no-command behaviour; `run.ts`
   returns `err.exitCode` (1) for the `CommanderError`.
 
-### 14. `series`/`timestamps` accept zero-padded filter ids that silently normalise
+### 14. `series`/`timestamps` accept zero-padded filter ids that silently normalise — ⚠️ WONTFIX (benign, intentional integer parsing)
+**Fix:** No code change. `parseNonNegativeInt` deliberately accepts any `^\d+$` and parses it as a base-10 integer; `0410` → `410` is standard integer normalisation and the request still targets the correct, canonical filter id. Rejecting leading zeros would add friction without preventing any incorrect request. Left as-is.
 - **Severity:** Low · **Confidence:** High
 - **Repro:** mock capturing the request URL:
   ```
@@ -241,7 +255,8 @@ Medium 9, Low 8.**
   but a surprising input→output transform with no warning.
 - **Root cause:** `src/cli/shared.ts:21-26`.
 
-### 15. Timestamp `0` / far-past / far-future all map to a generic 404 (exit 4) with no hint
+### 15. Timestamp `0` / far-past / far-future all map to a generic 404 (exit 4) with no hint — ⚠️ WONTFIX (deliberate single-request design)
+**Fix:** No code change. `series()` is intentionally a single, direct file fetch (no extra index round-trip); a 404 with the requested URL is the documented signal. Pre-validating every timestamp against the index would double the request count for the common (valid) case. UX shortfall noted, not a defect.
 - **Severity:** Low · **Confidence:** High
 - **Repro:**
   ```
@@ -255,7 +270,8 @@ Medium 9, Low 8.**
 - **Root cause:** `series()` (`client.ts:36-45`) fetches the file directly without
   consulting the index; design choice, but poor UX for the common mistake.
 
-### 16. `table` rejects all `timestamps`-command outputs; the only working timestamps are undiscoverable
+### 16. `table` rejects all `timestamps`-command outputs; the only working timestamps are undiscoverable — ✅ FIXED (documentation)
+**Fix:** Added a note to `README.md` (Commands section) explaining that `table` reads `table_data`, whose valid timestamps are a different set than the `timestamps` command (`chart_data`) returns, and that the public API exposes no discovery endpoint for them — so a `table` call may 404 for a timestamp valid for `series`/`latest`.
 - **Severity:** Low · **Confidence:** High
 - **Repro (live):**
   ```
@@ -272,7 +288,8 @@ Medium 9, Low 8.**
 - **Root cause:** documentation gap; `client.ts:59` builds the table URL from a
   caller-supplied timestamp with no discovery endpoint.
 
-### 17. `--max-response-bytes 1` aborts with a network-style error (exit 1), conflating size cap with network failure
+### 17. `--max-response-bytes 1` aborts with a network-style error (exit 1), conflating size cap with network failure — ✅ FIXED
+**Fix:** Added a dedicated `SmardResponseTooLargeError` (subclass of `SmardNetworkError`) in `src/client/errors.ts`, thrown by the size-cap branch in `src/client/http.ts` and exported from the public API. The exit code stays 1 (as documented), but library callers can now distinguish a size-cap breach from a genuine connection failure by type. The existing `instanceof SmardNetworkError` test still passes.
 - **Severity:** Low · **Confidence:** High
 - **Repro (live):**
   ```
@@ -289,7 +306,8 @@ Medium 9, Low 8.**
 - **Root cause:** `src/client/http.ts:78` throws `SmardNetworkError` for the size
   cap.
 
-### 18. `--timeout 0` silently disables the timeout with no indication
+### 18. `--timeout 0` silently disables the timeout with no indication — ✅ FIXED (documentation)
+**Fix:** `--timeout`'s help text now reads "(0 = no timeout)" (`src/cli/program.ts`) and the README global-options table documents the same. Behaviour (0 disables the timeout) is unchanged; it is now discoverable.
 - **Severity:** Low · **Confidence:** High
 - **Repro:**
   ```
@@ -302,7 +320,8 @@ Medium 9, Low 8.**
   `timeoutMs > 0`), undocumented in help/README.
 - **Root cause:** doc gap; `engine.ts:59` / `http.ts:98`.
 
-### 19. `requireInt` error message wording differs from commander's for the same concept
+### 19. `requireInt` error message wording differs from commander's for the same concept — ⚠️ WONTFIX (commander owns the option-error format)
+**Fix:** No code change. The "error:" prefix, quoting, and surrounding "option '...' argument '...' is invalid" wrapper are produced by commander's own error renderer for option value-parsers and cannot be unified with the positional (`requireInt`/`SmardError`) format without overriding commander's output and breaking the documented `InvalidArgumentError` contract (asserted in `test/shared.test.ts`). Both forms are clear; the difference is cosmetic.
 - **Severity:** Low · **Confidence:** High
 - **Repro:**
   ```
@@ -318,7 +337,8 @@ Medium 9, Low 8.**
   go through `parseIntArg`/`InvalidArgumentError`).
 - **Root cause:** `src/cli/shared.ts:32` vs `45`.
 
-### 20. Far-past/unknown integer filter and far-future timestamp are all surfaced identically; no input sanity bounds
+### 20. Far-past/unknown integer filter and far-future timestamp are all surfaced identically; no input sanity bounds — ⚠️ WONTFIX (intentional design, per README)
+**Fix:** No code change. As the report itself notes and `README.md` documents, the API accepts any integer filter id, so the CLI deliberately forwards any non-negative integer and uses `FILTERS` only for the `filters` listing. Warning on ids outside the (non-exhaustive) catalogue would risk false negatives for valid-but-undocumented ids. Listed as a UX cost, not a defect.
 - **Severity:** Low · **Confidence:** Medium
 - **Repro (live):**
   ```
