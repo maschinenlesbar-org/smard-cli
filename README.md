@@ -11,6 +11,10 @@ A TypeScript **API client** and **command-line interface** for the open
 - **Well tested** — unit tests on Node's built-in test runner (`node --test`), every HTTP response mocked.
 - **Read-only, no auth** — the SMARD chart-data API needs no key; this client only reads.
 
+New to SMARD, or terms like *filter*, *bidding zone*, *residual load* or
+*resolution*? See **[GLOSSARY.md](GLOSSARY.md)** for the domain concepts and the
+project's own vocabulary.
+
 ## Requirements
 
 - Node.js **>= 20** (uses the stable built-in test runner, ESM and top-level `await`).
@@ -109,7 +113,7 @@ a generic failure rather than expecting per-cause granularity.
 ## Library usage
 
 ```ts
-import { SmardClient, SmardApiError, FILTERS } from "smard-cli";
+import { SmardClient, SmardApiError, FILTERS } from "@maschinenlesbar.org/smard-cli";
 
 const client = new SmardClient(); // defaults to https://www.smard.de
 
