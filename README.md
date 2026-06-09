@@ -1,223 +1,183 @@
 # smard-cli
 
-A TypeScript **API client** and **command-line interface** for the open
-[SMARD](https://smard.api.bund.dev/) chart-data API (`smard.de`) operated by the
-**Bundesnetzagentur** — German electricity-market data: **generation**,
-**consumption / residual load**, and **wholesale prices**.
+Query Germany's open **electricity-market data** from your terminal. `smard` is
+a command-line tool over the [SMARD chart-data API](https://smard.api.bund.dev/)
+(`smard.de`), operated by the Bundesnetzagentur — fetch generation, consumption,
+residual load and wholesale prices as clean JSON you can pipe straight into
+[`jq`](https://jqlang.github.io/jq/).
 
-- **Zero runtime HTTP dependencies** — built on Node's built-in `http`/`https` (no axios, no fetch polyfill).
-- **One small dependency** for the CLI: [`commander`](https://github.com/tj/commander.js).
-- **Strongly typed** — typed client surface, series shapes, and region/resolution enums.
-- **Well tested** — unit tests on Node's built-in test runner (`node --test`), every HTTP response mocked.
-- **Read-only, no auth** — the SMARD chart-data API needs no key; this client only reads.
+- **Works out of the box** — no account, no API key, no configuration. Install and query.
+- **Clean JSON output** — pretty-printed by default, `--compact` for one-line/scripting.
+- **Seven commands** — discover filters/regions, fetch the newest window in one call, or navigate timestamps manually.
+- **No credentials to manage** — the SMARD API is fully open; this tool only reads.
 
-New to SMARD, or terms like *filter*, *bidding zone*, *residual load* or
-*resolution*? See **[GLOSSARY.md](GLOSSARY.md)** for the domain concepts and the
-project's own vocabulary.
-
-## Requirements
-
-- Node.js **>= 20** (uses the stable built-in test runner, ESM and top-level `await`).
+> Want to use this as a TypeScript library or understand how it's built?
+> See **[DEVELOPING.md](DEVELOPING.md)**.
 
 ## Install
 
 ```bash
-npm install
-npm run build        # compiles TypeScript to dist/
+npm i -g @maschinenlesbar.org/smard-cli
 ```
 
-Run the CLI without a global install:
+This installs the **`smard`** command. Requires **Node.js 20+**.
+
+Check it works:
 
 ```bash
-node dist/src/cli/index.js --help
-# or, after `npm link` / global install:
 smard --help
 ```
 
----
+## Quickstart
 
-## How the API works
-
-SMARD publishes a static file tree. For a **(filter, region, resolution)** triple
-it offers an **index** of available window timestamps, and one **data file** per
-timestamp. Each data file covers a fixed window (e.g. one week of hourly values),
-so to get the newest data you read the index, take the last timestamp, then fetch
-that file. The `latest` command does that for you in one call.
-
-- **filter** — a numeric series id (see `smard filters`), e.g. `410` = total grid load.
-- **region** — see `smard regions`, e.g. `DE`, `DE-LU`, `TenneT`.
-- **resolution** — `hour | quarterhour | day | week | month | year`.
-- **timestamp** — an epoch-millisecond value from `smard timestamps`.
-
-### Global options
-
-| Option | Description |
-| --- | --- |
-| `--base-url <url>` | API base URL (default `https://www.smard.de`) |
-| `--timeout <ms>` | Per-request timeout (default `30000`; `0` = no timeout) |
-| `--user-agent <ua>` | `User-Agent` header value |
-| `--max-retries <n>` | Retries for transient `429`/`503` responses (default `2`) |
-| `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
-| `--compact` | Print JSON on a single line |
-
-Global options may be passed **before or after** the command (commander resolves
-them either way), e.g. `smard --compact latest 410 DE hour` or
-`smard latest 410 DE hour --compact`. Placing them before the command is the
-conventional, recommended position.
-
-### Commands
-
-```text
-timestamps <filter> <region> <resolution>              available window timestamps
-series     <filter> <region> <resolution> <timestamp>  one window's data
-latest     <filter> <region> <resolution>              newest window's data (one call)
-table      <filter> <region> <timestamp>               quarter-hour table_data (see note)
-filters    [--group generation|consumption|price|forecast]   filter catalogue
-regions                                                 valid region codes
-resolutions                                             valid resolution values
-```
-
-> **Note on `table` timestamps:** the `table` command reads from `table_data`,
-> whose valid window timestamps are **not** the same set returned by the
-> `timestamps` command (which lists `chart_data` windows). There is no discovery
-> endpoint for `table_data` timestamps in the public API, so a `table` call may
-> `404` for a timestamp that is valid for `series`/`latest`.
-
-### Examples
+No setup needed — the API requires no key. Your first query:
 
 ```bash
-# Which filters exist? (just the consumption ones)
+smard latest 410 DE week
+```
+
+That fetches the newest week of total grid load for Germany. The result is a
+JSON object: time-series values live under `series`, metadata under `meta_data`.
+Pull out just the series with `jq`:
+
+```bash
+smard latest 410 DE week | jq '.series'
+```
+
+Show just the most recent data point:
+
+```bash
+smard --compact latest 410 DE week | jq '.series[-1]'
+```
+
+## Commands
+
+```text
+timestamps  <filter> <region> <resolution>              available window timestamps
+series      <filter> <region> <resolution> <timestamp>  one window's data
+latest      <filter> <region> <resolution>              newest window's data (one call)
+table       <filter> <region> <timestamp>               quarter-hour table_data
+filters     [--group generation|consumption|price|forecast]   filter catalogue
+regions                                                  valid region codes
+resolutions                                              valid resolution values
+```
+
+### Positional arguments
+
+| Argument | What it means |
+| --- | --- |
+| `<filter>` | Numeric series id — e.g. `410` (total grid load), `4068` (photovoltaics), `4169` (DE-LU wholesale price). Use `smard filters` to browse all documented ids. |
+| `<region>` | Grid or bidding-zone code — e.g. `DE`, `DE-LU`, `TenneT`. Use `smard regions` for the full list. |
+| `<resolution>` | Temporal granularity: `hour`, `quarterhour`, `day`, `week`, `month`, or `year`. Use `smard resolutions` to confirm. |
+| `<timestamp>` | Epoch-millisecond window start from `smard timestamps`. |
+
+### `filters` option
+
+| Flag | Meaning |
+| --- | --- |
+| `--group <group>` | Only show one group: `generation`, `consumption`, `price`, or `forecast` |
+
+> **Note on `table` timestamps:** `table` reads the separate `table_data`
+> endpoint. Its valid window timestamps are **not** the same set returned by
+> `timestamps` (which lists `chart_data` windows). A `table` call may `404` for
+> a timestamp that is valid for `series`/`latest`.
+
+## Common tasks
+
+A few recipes to get going — see **[Usage.md](Usage.md)** for the full,
+use-case-driven set.
+
+```bash
+# What filter ids exist? Show just the consumption group
 smard filters --group consumption
 
 # Newest week of total grid load for Germany
 smard latest 410 DE week
 
-# Newest hour-resolution photovoltaic generation, compact
+# Newest hourly wholesale price for the DE-LU bidding zone (EUR/MWh)
+smard latest 4169 DE-LU hour
+
+# Newest photovoltaic generation, compact output
 smard --compact latest 4068 DE hour
 
-# Pick a specific window explicitly. The available timestamps roll over time, so
-# read one from `timestamps` rather than hard-coding a value (older windows 404).
-smard timestamps 4169 DE-LU hour          # -> [ ..., <some valid timestamp> ]
-TS=$(smard --compact timestamps 4169 DE-LU hour | python3 -c 'import json,sys; print(json.load(sys.stdin)[-1])')
+# Latest wind onshore and wind offshore generation
+smard latest 4067 DE hour    # Wind Onshore
+smard latest 1225 DE hour    # Wind Offshore
+
+# Pick a specific window explicitly (available timestamps roll over — don't hard-code one)
+TS=$(smard --compact timestamps 4169 DE-LU hour | jq '.[-1]')
 smard series 4169 DE-LU hour "$TS"
 ```
 
-Exit codes: `0` success, `4` on a `404` from the API, `1` for any other error,
-non-zero for usage errors. Network errors, timeouts, parse errors and non-404 API
-statuses (e.g. `500`/`503`) **deliberately** all map to `1`; only `404` is given a
-distinct code. If you script against this CLI, treat any non-zero, non-`4` code as
-a generic failure rather than expecting per-cause granularity.
+## Output & scripting
 
----
-
-## Library usage
-
-```ts
-import { SmardClient, SmardApiError, FILTERS } from "@maschinenlesbar.org/smard-cli";
-
-const client = new SmardClient(); // defaults to https://www.smard.de
-
-const windows = await client.timestamps(410, "DE", "week"); // number[]
-const data = await client.series(410, "DE", "week", windows.at(-1)!);
-console.log(data.series.length, "points");
-
-// Or in one call:
-const latest = await client.latest(4068, "DE", "hour");
-
-try {
-  await client.series(410, "DE", "hour", 1);
-} catch (err) {
-  if (err instanceof SmardApiError) console.error(err.status, err.detail);
-}
-```
-
-### Client options
-
-```ts
-new SmardClient({
-  baseUrl: "https://www.smard.de",
-  timeoutMs: 15_000,
-  maxRetries: 3,              // 429 / 503 are retried with linear backoff
-  maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
-  userAgent: "my-app/1.0",
-  transport: customTransport, // inject your own HTTP transport
-});
-```
-
-### Methods
-
-`client.timestamps(filter, region, resolution)`, `client.series(filter, region, resolution, timestamp)`,
-`client.latest(filter, region, resolution)`, `client.tableData(filter, region, timestamp)`.
-The `FILTERS` array and the `RegionValues` / `ResolutionValues` enums are exported for reference.
-
-> **Note for library callers:** `SmardClient` performs **no** validation of its
-> `filter` / `region` / `resolution` / `timestamp` arguments — all input
-> validation (non-negative integers, enum membership) lives in the CLI layer.
-> The `Region` / `Resolution` types are compile-time hints only; an arbitrary
-> string cast to `Region` is merely `encodeURIComponent`-escaped, not checked
-> against `RegionValues`. Validate untrusted input yourself before calling.
->
-> Likewise, the **response** types (`SeriesResult` / `TableResult`) are a typed
-> **pass-through**: any successful (2xx) JSON body is parsed and returned cast to
-> the method's return type without structural validation. The one exception is
-> `timestamps()`, which validates that `timestamps` is an array (else throws
-> `SmardParseError`). For `series` / `latest` / `tableData`, treat the typing as a
-> convenience over the documented API shape, not a runtime guarantee.
-
----
-
-## Architecture
-
-```
-src/
-  client/
-    enums.ts     # Region/Resolution value sets + the filter catalogue (FILTERS)
-    types.ts     # response interfaces (TimestampIndex, SeriesResult, TableResult)
-    query.ts     # dependency-free query-string builder
-    http.ts      # the Transport interface + default node:http/https transport
-    engine.ts    # URL building, retry/backoff, JSON/raw decoding, error mapping
-    errors.ts    # SmardError / SmardApiError / SmardNetworkError / SmardParseError
-    client.ts    # SmardClient — the chart-data surface over the engine
-  cli/
-    io.ts        # injectable I/O seam (stdout/stderr/file)
-    shared.ts    # option parsers, global-option resolver, JSON renderer
-    commands/    # chart (timestamps/series/latest/table) + catalogue commands
-    program.ts   # assembles the commander program from injectable deps
-    run.ts       # parses argv -> exit code (no process.exit; testable)
-    index.ts     # #! bin shim
-```
-
-**Design notes**
-
-- The HTTP layer is a single `Transport` function (`(req) => Promise<HttpResponse>`). The default
-  uses `node:http`/`node:https`; tests inject a mock. This keeps the client free of any HTTP framework.
-- The CLI is built around injectable `CliDeps` (client factory + I/O), so the whole program can be
-  driven in-process by tests with a mocked client and captured output — no subprocesses.
-- The API accepts any integer filter id, so the CLI accepts any integer and uses the `FILTERS`
-  catalogue only for the `filters` listing and documentation.
-
----
-
-## Testing
+Every command prints **pretty JSON to stdout**. Errors go to stderr, so piping
+stdout into `jq` stays clean.
 
 ```bash
-npm test          # builds, then runs `node --test` over dist/test
+# Count data points in a series window
+smard --compact latest 4068 DE hour | jq '.series | length'
+
+# Sum all non-null values in a window (total MWh)
+smard --compact latest 4068 DE hour | jq '[.series[][1] | select(. != null)] | add'
+
+# Save a window to a file
+smard --compact latest 410 DE day > load.json
 ```
 
-- **`query.test.ts`** — query-string serialisation.
-- **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
-- **`engine.test.ts`** — URL building, JSON decoding, error mapping, 429/503 retry — mocked transport.
-- **`client.test.ts`** — every method's URL mapping, including the `latest` index→data flow — mocked transport.
-- **`cli.test.ts`** — end-to-end command parsing, validation and exit codes — mocked client.
+Use `--compact` for single-line JSON in pipelines and logs:
 
-## Continuous integration
+```bash
+smard --compact latest 410 DE week | jq -c '.series[-3:]'
+```
 
-GitHub Actions workflows under `.github/workflows/`:
+`--compact` (and every global option) works **before or after** the command —
+both `smard --compact latest …` and `smard latest … --compact` do the same thing.
 
-- **ci.yml** — type-check, build and test on Node 20/22/24 for every push and PR.
-- **release.yml** — on a `v*` tag: verify the tag matches `package.json`, test, `npm pack`, and create a GitHub Release with the tarball.
-- **publish.yml** — manual dispatch: publish to npm via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
-- **docs.yml** — build TypeDoc API docs and deploy to GitHub Pages on each `v*` tag.
+**Exit codes** make the CLI easy to use in scripts:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | success (also `--help` / `--version`) |
+| `4` | resource not found (`404`) — e.g. a stale timestamp or unknown filter/region combination |
+| `1` | any other error: network failure, timeout, parse error, non-404 API status |
+| non-zero | usage / invalid argument (bad region, non-integer filter, etc.) |
+
+## Troubleshooting
+
+- **`command not found: smard`** — the global npm bin directory isn't on your
+  `PATH`. Run `npm bin -g` to find it and add it, or run via
+  `npx @maschinenlesbar.org/smard-cli …`.
+- **Exit `4` / "not found"** — the timestamp or filter/region/resolution
+  combination doesn't exist. Re-run `smard timestamps <filter> <region>
+  <resolution>` to get a fresh list; available windows roll over time. For
+  `table`, note that `table_data` timestamps differ from `chart_data` ones.
+- **Exit `1` / network error** — connectivity, DNS, or a timeout. Try again,
+  or raise the limit with `--timeout 60000`.
+- **`smard timestamps` returns an empty array** — the API has no data for that
+  filter/region/resolution combination. Verify with `smard regions` and
+  `smard filters` that your values are valid.
+
+## Global options
+
+These apply to every command and may be given before *or* after it:
+
+| Option | Description |
+| --- | --- |
+| `-V, --version` | Print the version number |
+| `-h, --help` | Show help for the program or a command |
+| `--compact` | Print JSON on a single line instead of pretty-printed |
+| `--base-url <url>` | API base URL (default `https://www.smard.de`) |
+| `--timeout <ms>` | Per-request timeout in ms (`0` = no timeout; default `30000`) |
+| `--user-agent <ua>` | `User-Agent` header value |
+| `--max-retries <n>` | Retries for transient `429`/`503` responses (default `2`) |
+| `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
+
+## Learn more
+
+- **[Usage.md](Usage.md)** — full use-case-driven cookbook.
+- **[GLOSSARY.md](GLOSSARY.md)** — every domain term, filter group, region code, and data shape explained.
+- **[DEVELOPING.md](DEVELOPING.md)** — TypeScript library usage, architecture, testing, CI.
 
 ## License
 

@@ -194,59 +194,7 @@ valid resolution values — served locally from the bundled enums, no network ca
 
 ---
 
-## Identifiers & validation
-
-**FILTERS.** The exported catalogue of documented filters: `{ id, label, group }`
-records. Used for the `filters` listing only — not a closed set.
-
-**RegionValues / ResolutionValues.** Const arrays that double as runtime CLI
-choice validators and as the `Region` / `Resolution` TypeScript union types.
-
-**Validation boundary.** All input validation (non-negative integers, enum
-membership) lives in the **CLI** layer. `SmardClient` performs **no** validation:
-a `Region`/`Resolution` is a compile-time hint only and is merely
-`encodeURIComponent`-escaped, not checked against the value arrays. Validate
-untrusted input yourself before calling the library directly.
-
-**Typed pass-through.** Response types (`SeriesResult`, `TableResult`) are a
-convenience typing over the documented shape, not a runtime guarantee: any 2xx
-JSON body is parsed and cast to the return type without structural validation.
-The one exception is `timestamps()`, which checks that `timestamps` is an array
-(else throws `SmardParseError`).
-
----
-
-## Project / technical terms
-
-**API client.** [`SmardClient`](src/client/client.ts) — the typed wrapper over
-the chart-data endpoints. Usable as a library independently of the CLI.
-
-**Transport.** A single function `(HttpRequest) => Promise<HttpResponse>`
-([`http.ts`](src/client/http.ts)). The default uses Node's built-in
-`http`/`https`; tests inject a mock. This is the only HTTP seam.
-
-**Request engine.** [`RequestEngine`](src/client/engine.ts) — builds URLs,
-serialises queries, applies retry/backoff, decodes JSON/raw responses and maps
-errors. Sits between the client and the transport.
-
-**RawResponse.** The engine's raw result: `{ data: Buffer, contentType, status }`
-— raw bytes, never lossily decoded.
-
-**CliDeps / CliIO.** The dependency-injection seam for the CLI
-([`io.ts`](src/cli/io.ts)): a client factory plus an I/O object (`out`/`err`/…).
-Lets the whole CLI run in tests with a mocked client and captured output — no
-subprocess.
-
-**Retry / backoff.** The engine automatically retries transient `429`
-(rate-limited) and `503` responses with **linear** backoff, up to `--max-retries`
-(default `2`). `SmardApiError.isRetryable` flags these statuses.
-
-**maxResponseBytes.** A hard cap (default 100 MiB; `0` = unlimited) on response
-body size, defending against memory exhaustion; a breach aborts the request with
-`SmardResponseTooLargeError`.
-
-**Error types.** [`errors.ts`](src/client/errors.ts): `SmardApiError` (non-2xx,
-carries `status`/`detail`/`url`/`body`), `SmardNetworkError` (transport
-failure/timeout), `SmardResponseTooLargeError` (size-cap breach, a subclass of
-`SmardNetworkError`) and `SmardParseError` (bad JSON), all extending
-`SmardError`. The CLI maps a `404` to exit code `4`, every other error to `1`.
+> **Library & internals.** Terms for the TypeScript client and its internals —
+> `SmardClient`, the request engine, transport, retry/backoff, error types,
+> `FILTERS`/`RegionValues`/`ResolutionValues`, and the validation boundary —
+> now live in **[DEVELOPING.md](DEVELOPING.md)**.
