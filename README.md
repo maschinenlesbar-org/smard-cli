@@ -1,5 +1,10 @@
 # smard-cli
 
+[![CI](https://github.com/maschinenlesbar-org/smard-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/maschinenlesbar-org/smard-cli/actions/workflows/ci.yml)
+[![Release](https://github.com/maschinenlesbar-org/smard-cli/actions/workflows/release.yml/badge.svg)](https://github.com/maschinenlesbar-org/smard-cli/actions/workflows/release.yml)
+[![GitHub release](https://img.shields.io/github/v/release/maschinenlesbar-org/smard-cli)](https://github.com/maschinenlesbar-org/smard-cli/releases/latest)
+[![npm](https://img.shields.io/npm/v/@maschinenlesbar.org/smard-cli)](https://www.npmjs.com/package/@maschinenlesbar.org/smard-cli)
+
 Query Germany's open **electricity-market data** from your terminal. `smard` is
 a command-line tool over the [SMARD chart-data API](https://smard.api.bund.dev/)
 (`smard.de`), operated by the Bundesnetzagentur — fetch generation, consumption,
