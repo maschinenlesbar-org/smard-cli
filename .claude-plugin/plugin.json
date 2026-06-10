@@ -1,0 +1,25 @@
+{
+  "name": "smard",
+  "version": "0.1.0",
+  "description": "German electricity-market intelligence skills powered by the smard-cli (Bundesnetzagentur SMARD chart-data API).",
+  "author": {
+    "name": "Sebastian Schürmann",
+    "email": "sebs@2xs.org"
+  },
+  "license": "AGPL-3.0-or-later",
+  "repository": "https://github.com/maschinenlesbar-org/smard-cli",
+  "homepage": "https://github.com/maschinenlesbar-org/smard-cli#readme",
+  "keywords": [
+    "smard",
+    "strommarkt",
+    "bundesnetzagentur",
+    "electricity",
+    "energy",
+    "generation",
+    "consumption",
+    "wholesale-price",
+    "renewables",
+    "germany",
+    "bund.dev"
+  ]
+}

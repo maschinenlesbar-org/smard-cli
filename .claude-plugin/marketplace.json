@@ -1,0 +1,39 @@
+{
+  "name": "smard-skills",
+  "owner": {
+    "name": "Sebastian Schürmann",
+    "email": "sebs@2xs.org"
+  },
+  "metadata": {
+    "description": "German electricity-market intelligence skills powered by the smard-cli (Bundesnetzagentur SMARD chart-data API)"
+  },
+  "plugins": [
+    {
+      "name": "smard",
+      "source": "./",
+      "description": "Build Germany's generation mix and renewable share, summarise day-ahead wholesale prices across bidding zones, and export gap-clean electricity time series — all over the open, key-free SMARD chart-data API via the smard-cli.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Sebastian Schürmann",
+        "email": "sebs@2xs.org"
+      },
+      "license": "AGPL-3.0-or-later",
+      "repository": "https://github.com/maschinenlesbar-org/smard-cli",
+      "homepage": "https://github.com/maschinenlesbar-org/smard-cli#readme",
+      "category": "energy",
+      "keywords": [
+        "smard",
+        "strommarkt",
+        "bundesnetzagentur",
+        "electricity",
+        "energy",
+        "generation",
+        "consumption",
+        "wholesale-price",
+        "renewables",
+        "germany",
+        "bund.dev"
+      ]
+    }
+  ]
+}
