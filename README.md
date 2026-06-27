@@ -83,8 +83,10 @@ resolutions                                              valid resolution values
 
 > **Note on `table` timestamps:** `table` reads the separate `table_data`
 > endpoint. Its valid window timestamps are **not** the same set returned by
-> `timestamps` (which lists `chart_data` windows). A `table` call may `404` for
-> a timestamp that is valid for `series`/`latest`.
+> `timestamps` (which lists `chart_data` windows). In particular `table_data`
+> **lags** `chart_data`: the newest `timestamps` windows usually have no
+> `table_data` yet, so passing a recent timestamp will `404`. Use an older window
+> (e.g. a timestamp from earlier in the `timestamps` list) — those resolve fine.
 
 ## Common tasks
 

@@ -147,3 +147,35 @@ test("global options propagate into the client via toEngineOptions", async () =>
   assert.equal(cli.mt.last().headers?.["User-Agent"], "probe/9");
   assert.equal(cli.mt.last().timeoutMs, 1234);
 });
+
+test("no command prints help to stdout and exits 0", async () => {
+  const cli = makeCli(() => jsonResponse({}));
+  const code = await run([], cli.deps);
+  assert.equal(code, 0);
+  assert.equal(cli.mt.calls.length, 0); // never touched the network
+  assert.equal(cli.err.length, 0); // help went to stdout, not stderr
+  assert.match(cli.out.join("\n"), /Usage: smard/);
+});
+
+test("global options without a command still show help on stdout, exit 0", async () => {
+  const cli = makeCli(() => jsonResponse({}));
+  const code = await run(["--compact", "--timeout", "5000"], cli.deps);
+  assert.equal(code, 0);
+  assert.equal(cli.err.length, 0);
+  assert.match(cli.out.join("\n"), /Usage: smard/);
+});
+
+test("an unknown command still errors on stderr with exit 1", async () => {
+  const cli = makeCli(() => jsonResponse({}));
+  const code = await run(["boguscmd"], cli.deps);
+  assert.equal(code, 1);
+  assert.equal(cli.out.length, 0);
+  assert.match(cli.err.join("\n"), /unknown command 'boguscmd'/);
+});
+
+test("an unknown option (no command) still errors with exit 1", async () => {
+  const cli = makeCli(() => jsonResponse({}));
+  const code = await run(["--bogus-opt"], cli.deps);
+  assert.equal(code, 1);
+  assert.match(cli.err.join("\n"), /unknown option '--bogus-opt'/);
+});
