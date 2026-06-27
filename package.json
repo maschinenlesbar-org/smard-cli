@@ -1,6 +1,6 @@
 {
   "name": "@maschinenlesbar.org/smard-cli",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "TypeScript API client and CLI for the open SMARD electricity-market chart-data API (smard.de)",
   "type": "module",
   "bin": {
