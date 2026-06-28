@@ -104,9 +104,13 @@ smard --compact series 410 DE hour "$ts" \
 
 Write to a file the user can open (default
 `./smard-<filter>-<region>-<resolution>.csv`) and report:
+- **the path you wrote**,
 - row count and the actual covered date range (first → last timestamp),
 - how many null/gap points were dropped or kept,
 - the unit.
+
+If a name the user supplied already exists, confirm before overwriting it (re-running with
+the default name to refresh is fine).
 
 Offer JSON (`{ timestamp, value }[]`) as an alternative, and offer a wider/longer range
 (more windows) if the user wants more history.
