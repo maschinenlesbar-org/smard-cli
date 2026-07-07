@@ -40,7 +40,11 @@ available window timestamps plus one *data file* per window. The base URL is
 `https://www.smard.de`.
 
 **Read-only, no auth.** The chart-data endpoints require no API key. This client
-only performs `GET` requests and never writes.
+only performs `GET` requests and never writes. No credential header is ever
+constructed. Redirects are **not followed** — a `3xx` surfaces as a
+`SmardApiError` — and only `http:`/`https:` base URLs are accepted (enforced in
+the default transport). See DEVELOPING.md "Design notes" for these deliberate
+divergences from the workspace blueprint.
 
 ---
 

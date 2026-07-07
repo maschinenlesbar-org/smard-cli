@@ -114,6 +114,15 @@ src/
   driven in-process by tests with a mocked client and captured output — no subprocesses.
 - The API accepts any integer filter id, so the CLI accepts any integer and uses the `FILTERS`
   catalogue only for the `filters` listing and documentation.
+- **Network policy (deliberate blueprint divergences).** Redirects are **never
+  followed**: any `3xx` falls into the non-2xx branch and surfaces as a
+  `SmardApiError`, so there is no cross-origin hop on which anything could leak
+  (and, being keyless, nothing to leak). The `http:`/`https:` **scheme allowlist**
+  lives in the **default transport** (`http.ts`), not in the `--base-url` option
+  parser, so a `file:`/`ftp:` base URL is rejected before any request is made, but
+  it exits `1` (as `SmardNetworkError`) rather than the blueprint's parse-time
+  exit `2`. A library caller that injects a custom `Transport` is responsible for
+  its own scheme policy.
 
 ### Library / technical terms
 
@@ -162,8 +171,12 @@ a `Region`/`Resolution` is a compile-time hint only, merely
 
 **Typed pass-through.** Response types (`SeriesResult`, `TableResult`) are a
 convenience typing over the documented shape, not a runtime guarantee. The one
-exception is `timestamps()`, which checks that `timestamps` is an array (else
-throws `SmardParseError`).
+exception is `timestamps()`, which checks that `timestamps` is an array **and
+that every element is a safe integer** (else throws `SmardParseError`). The
+element-type check is a security boundary: `latest()` interpolates a chosen
+element unencoded into the path of a follow-up `series()` request, so a hostile
+or MITM'd origin returning a string element (e.g. `"1/../evil"`) could otherwise
+steer that request to an arbitrary same-origin path.
 
 ## Testing
 
