@@ -36,6 +36,17 @@ export class SmardClient {
         `Malformed index from ${path}: "timestamps" is not an array.`,
       );
     }
+    // Validate the *element* type, not just that `timestamps` is an array. A
+    // later request interpolates a chosen element unencoded into the path of a
+    // follow-up GET (`series()` in `latest()`), so a hostile/MITM'd origin that
+    // returned a string element such as `"x#"` or `"1/../evil"` could steer the
+    // second request to an arbitrary same-origin path. Requiring safe integers
+    // makes such a value un-injectable at the trust boundary.
+    if (!ts.every((t) => typeof t === "number" && Number.isSafeInteger(t))) {
+      throw new SmardParseError(
+        `Malformed index from ${path}: "timestamps" contains a non-integer element.`,
+      );
+    }
     return ts;
   }
 

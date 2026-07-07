@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SmardClient } from "../src/client/client.js";
-import { SmardApiError } from "../src/client/errors.js";
+import { SmardApiError, SmardParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, constantJson } from "./helpers.js";
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>): SmardClient {
@@ -45,6 +45,38 @@ test("latest returns an empty series when the index is empty", async () => {
   const res = await clientWith(mt).latest(410, "DE", "hour");
   assert.deepEqual(res.series, []);
   assert.equal(mt.calls.length, 1); // never fetched a data file
+});
+
+test("a hostile timestamps element cannot steer the follow-up request path", async () => {
+  // A hostile/MITM'd origin returns a *string* index element crafted to break
+  // out of the intended path when interpolated into the second GET. `latest()`
+  // must reject it at the trust boundary and never issue the follow-up request.
+  let indexCalls = 0;
+  const mt = makeMockTransport((req) => {
+    if (req.url.includes("index_")) {
+      indexCalls += 1;
+      // `"x#"` would strip the `.json` suffix via a URL fragment; `"1/../evil"`
+      // would normalise to a different same-origin path.
+      return jsonResponse({ timestamps: ["1/../evil"] });
+    }
+    // If the guard fails, this is the only other response the transport gives.
+    return jsonResponse({ meta_data: { version: 1, created: 2 }, series: [] });
+  });
+  await assert.rejects(
+    () => clientWith(mt).latest(410, "DE", "hour"),
+    (err) => err instanceof SmardParseError,
+  );
+  // Only the index was fetched; no follow-up request was steered anywhere.
+  assert.equal(indexCalls, 1);
+  assert.equal(mt.calls.length, 1);
+});
+
+test("timestamps rejects a non-integer element", async () => {
+  const mt = constantJson({ timestamps: [10, "20", 30] });
+  await assert.rejects(
+    () => clientWith(mt).timestamps(410, "DE", "hour"),
+    (err) => err instanceof SmardParseError,
+  );
 });
 
 test("tableData builds the table_data path", async () => {
