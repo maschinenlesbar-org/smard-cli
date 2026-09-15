@@ -176,7 +176,7 @@ These apply to every command and may be given before *or* after it:
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
 | `--base-url <url>` | API base URL (default `https://www.smard.de`) |
-| `--timeout <ms>` | Per-request timeout in ms (`0` = no timeout; default `30000`) |
+| `--timeout <ms>` | Time limit per request in ms, reading the whole response included (`0` = no timeout; default `30000`) |
 | `--user-agent <ua>` | `User-Agent` header value |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (default `2`) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |

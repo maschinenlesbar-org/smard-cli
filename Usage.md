@@ -178,7 +178,7 @@ recommended):
 | --- | --- |
 | `-V, --version` | print the version |
 | `--base-url <url>` | API base URL (default `https://www.smard.de`) |
-| `--timeout <ms>` | per-request timeout in ms (`0` = no timeout; default `30000`) |
+| `--timeout <ms>` | time limit per request in ms, whole response included (`0` = no timeout; default `30000`) |
 | `--user-agent <ua>` | `User-Agent` header value |
 | `--max-retries <n>` | retries for transient `429`/`503` responses (default `2`) |
 | `--max-response-bytes <n>` | cap response body size in bytes (`0` = unlimited; default 100 MiB) |
