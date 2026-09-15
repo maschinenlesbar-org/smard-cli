@@ -167,6 +167,17 @@ test("global options propagate into the client via toEngineOptions", async () =>
   assert.equal(cli.mt.last().timeoutMs, 1234);
 });
 
+test("--timeout accepts up to the largest timer Node supports", async () => {
+  const cli = makeCli(() => jsonResponse({ timestamps: [] }));
+  assert.equal(await run(["--timeout", "2147483647", "timestamps", "410", "DE", "hour"], cli.deps), 0);
+  assert.equal(cli.mt.last().timeoutMs, 2_147_483_647);
+
+  const over = makeCli(() => jsonResponse({ timestamps: [] }));
+  assert.equal(await run(["--timeout", "2147483648", "timestamps", "410", "DE", "hour"], over.deps), 1);
+  assert.equal(over.mt.calls.length, 0); // rejected before any request
+  assert.match(over.err.join("\n"), /Must be <= 2147483647/);
+});
+
 test("no command prints help to stdout and exits 0", async () => {
   const cli = makeCli(() => jsonResponse({}));
   const code = await run([], cli.deps);

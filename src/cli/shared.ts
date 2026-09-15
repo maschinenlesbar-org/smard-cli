@@ -34,6 +34,16 @@ export function parseIntArg(value: string): number {
   return n;
 }
 
+/** Build a commander value-parser for a non-negative integer constrained to [min, max]. */
+export function parseBoundedInt(min: number, max: number): (value: string) => number {
+  return (value: string) => {
+    const n = parseIntArg(value);
+    if (n < min) throw new InvalidArgumentError(`Must be >= ${min}.`);
+    if (n > max) throw new InvalidArgumentError(`Must be <= ${max}.`);
+    return n;
+  };
+}
+
 /**
  * Parse a positional argument as a non-negative integer (commander does not run
  * value-parsers on positional args). Throws a SmardError so run() prints a clear

@@ -8,7 +8,8 @@ import { Command } from "commander";
 import type { CliDeps } from "./io.js";
 import { defaultIO } from "./io.js";
 import { SmardClient } from "../client/client.js";
-import { parseIntArg } from "./shared.js";
+import { MAX_TIMEOUT_MS } from "../client/http.js";
+import { parseBoundedInt, parseIntArg } from "./shared.js";
 import { registerChartCommands } from "./commands/chart.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 
@@ -47,7 +48,12 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
     )
     .version(VERSION)
     .option("--base-url <url>", "API base URL", "https://www.smard.de")
-    .option("--timeout <ms>", "time limit per request in milliseconds, whole response included (0 = no timeout)", parseIntArg, 30_000)
+    .option(
+      "--timeout <ms>",
+      "time limit per request in milliseconds, whole response included (0 = no timeout)",
+      parseBoundedInt(0, MAX_TIMEOUT_MS),
+      30_000,
+    )
     .option("--user-agent <ua>", "User-Agent header value")
     .option("--max-retries <n>", "retries for transient 429/503 responses", parseIntArg, 2)
     .option(
