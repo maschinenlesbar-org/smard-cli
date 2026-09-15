@@ -50,10 +50,11 @@ Pull out just the series with `jq`:
 smard latest 410 DE week | jq '.series'
 ```
 
-Show just the most recent data point:
+Show just the most recent data point (the window runs to the end of its period, so
+`.series[-1]` is usually `[ts, null]` — skip the `null`s):
 
 ```bash
-smard --compact latest 410 DE week | jq '.series[-1]'
+smard --compact latest 410 DE week | jq -c '[.series[] | select(.[1] != null)][-1]'
 ```
 
 ## Commands
