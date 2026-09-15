@@ -93,7 +93,12 @@ total (`122`).
 
 **price (Großhandelspreis).** Day-ahead wholesale market prices for Germany/
 Luxembourg (`4169`) and neighbouring bidding zones (e.g. Austria `4170`,
-France `254`, Netherlands `256`, Switzerland `259`).
+France `254`, Netherlands `256`, Switzerland `259`). Since 1 October 2025 the
+day-ahead market sets a price per quarter-hour, and the `hour` series holds the
+mean of the four quarter-hour prices (before that, the `quarterhour` series
+repeats the hourly price). The next day's prices are published after the midday
+auction, so from the afternoon on the newest window already contains tomorrow's
+values.
 
 ---
 

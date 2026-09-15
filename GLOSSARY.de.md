@@ -91,7 +91,11 @@ gesamt (`122`).
 
 **price (Großhandelspreis).** Day-Ahead-Großhandelspreise für Deutschland/Luxemburg
 (`4169`) und benachbarte Gebotszonen (z. B. Österreich `4170`,
-Frankreich `254`, Niederlande `256`, Schweiz `259`).
+Frankreich `254`, Niederlande `256`, Schweiz `259`). Seit dem 1. Oktober 2025 bildet der
+Day-Ahead-Markt einen Preis je Viertelstunde, und die `hour`-Reihe enthält den Mittelwert der
+vier Viertelstundenpreise (davor wiederholt die `quarterhour`-Reihe den Stundenpreis).
+Die Preise des Folgetags erscheinen nach der Auktion zur Mittagszeit, ab dem Nachmittag enthält
+das neueste Zeitfenster also bereits Werte von morgen.
 
 ---
 

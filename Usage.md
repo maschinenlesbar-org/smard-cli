@@ -69,12 +69,21 @@ smard latest 4169 DE-LU hour
 ```
 
 Output is `{ meta_data, series }`, where `series` is an array of
-`[epochMillis, value]` pairs. Show just the most recent price:
+`[epochMillis, value]` pairs, each timestamp the start of its hour. The window
+runs to the end of the week, so `.series[-1]` is usually `[ts, null]`, and the
+last non-null point is the last *published* hour — often tomorrow 23:00, since
+the next day's prices come out after the midday day-ahead auction. Show the price
+for the current hour:
 
 ```bash
-smard --compact latest 4169 DE-LU hour | jq '.series[-1]'
-# [1780916400000, 55.22]
+smard --compact latest 4169 DE-LU hour \
+  | jq -c '[.series[] | select(.[1] != null and .[0] <= now * 1000)][-1]'
+# [1789502400000,199.46]
 ```
+
+Since 1 October 2025 the day-ahead market sets quarter-hour prices: each `hour`
+value is the mean of the four `quarterhour` prices
+(`smard latest 4169 DE-LU quarterhour`).
 
 ### 4. Latest renewable generation (photovoltaics / wind)
 

@@ -86,8 +86,12 @@ encode the non-obvious parts of this API, for example:
 
 - **the newest window's tail is `null`** — the latest `hour`/`day` window runs to the end
   of its period and the not-yet-published points come back as `[ts, null]`, so
-  `.series[-1]` is almost always a gap. The skills always take the **last non-null** point
-  (`[.series[] | select(.[1] != null)][-1]`) for "the current value";
+  `.series[-1]` is almost always a gap. The skills take the **last non-null** point
+  (`[.series[] | select(.[1] != null)][-1]`) for the latest published value — except for
+  day-ahead prices, where tomorrow's prices are published the afternoon before, so the price
+  watch takes the point at or before the current time for "now";
+- **the day-ahead price is quarter-hourly** — an `hour` price is the mean of four
+  quarter-hour prices, so the price watch uses `quarterhour` to find the cheapest slot;
 - **`timestamps` returns a bare `number[]`**, not the API's underlying
   `{ "timestamps": […] }` — the CLI unwraps the index, so `jq '.[-1]'`, never
   `.timestamps` (see **smard-series-export**);
