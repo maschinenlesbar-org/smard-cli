@@ -9,8 +9,10 @@ description: >
   the current hour or quarter-hour, the day's min/max/average and the cheapest /
   most-expensive slots, and ranks neighbouring zones — the time-series stats the
   CLI doesn't compute.
-version: 1.0.0
-userInvocable: true
+compatibility: >
+  Requires the `smard` CLI (npm package @maschinenlesbar.org/smard-cli) on PATH,
+  installed by the user; the skill never installs it. Uses jq for JSON
+  filtering. Network access to www.smard.de.
 ---
 
 # SMARD Price Watch
@@ -22,6 +24,8 @@ compares to neighbouring bidding zones** — instead of a wall of `[ts, value]` 
 ## Tooling
 
 This skill drives the `smard` command. **Before anything else, validate it is available** — run `command -v smard` (or `smard --version`). If it is not on your PATH, STOP and inform the user that the `smard` CLI (`@maschinenlesbar.org/smard-cli`) is not installed — installing it is their responsibility; never install it yourself, and do not fall back to `npx` or a local `node dist/...` build.
+
+This skill also filters JSON with `jq`. **Validate it too** — run `command -v jq`. If it is missing, inform the user that `jq` is not installed — installing it is their responsibility; never install it yourself — and carry on without it: filter the CLI output with `node -e` instead (Node is already on your PATH, since the CLI runs on it).
 
 Data comes from the `smard` CLI — read-only, no API key, **one (filter, region, resolution) series per call**.
 
