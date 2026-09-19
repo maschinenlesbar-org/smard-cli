@@ -9,7 +9,7 @@ import type { CliDeps } from "./io.js";
 import { defaultIO } from "./io.js";
 import { SmardClient } from "../client/client.js";
 import { MAX_TIMEOUT_MS } from "../client/http.js";
-import { parseBoundedInt, parseIntArg } from "./shared.js";
+import { parseBaseUrl, parseBoundedInt, parseIntArg } from "./shared.js";
 import { registerChartCommands } from "./commands/chart.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 
@@ -47,7 +47,7 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
         "generation, consumption, residual load and wholesale prices.",
     )
     .version(VERSION)
-    .option("--base-url <url>", "API base URL", "https://www.smard.de")
+    .option("--base-url <url>", "API base URL", parseBaseUrl, "https://www.smard.de")
     .option(
       "--timeout <ms>",
       "time limit per request in milliseconds, whole response included (0 = no timeout)",

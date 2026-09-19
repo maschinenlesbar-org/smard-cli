@@ -41,8 +41,10 @@ verfügbaren Fenster-Zeitstempel sowie eine *Datendatei* pro Fenster. Die Basis-
 API-Schlüssel. Dieser Client führt ausschließlich `GET`-Anfragen aus und schreibt nie.
 Es wird nie ein Credential-Header erzeugt. Weiterleitungen werden **nicht verfolgt** –
 ein `3xx` erscheint als `SmardApiError` –, und es werden nur Basis-URLs mit
-`http:`/`https:` akzeptiert (durchgesetzt im Standard-Transport). Diese bewussten
-Abweichungen vom Workspace-Blueprint beschreibt DEVELOPING.md im Abschnitt „Design notes“.
+`http:`/`https:` akzeptiert (durchgesetzt vom `--base-url`-Parser, von der
+Request-Engine und vom Standard-Transport). Die Netzwerkregeln und die bewusste
+Abweichung vom Workspace-Blueprint bei Weiterleitungen beschreibt DEVELOPING.md im
+Abschnitt „Design notes“.
 
 ---
 

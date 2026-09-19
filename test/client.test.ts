@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SmardClient } from "../src/client/client.js";
-import { SmardApiError, SmardParseError } from "../src/client/errors.js";
+import { SmardApiError, SmardNetworkError, SmardParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, constantJson } from "./helpers.js";
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>): SmardClient {
@@ -94,4 +94,13 @@ test("a 404 raises SmardApiError with status 404", async () => {
     () => clientWith(mt).series(410, "DE", "hour", 1),
     (err) => err instanceof SmardApiError && err.status === 404,
   );
+});
+
+test("a file: base URL is rejected when the client is constructed, before any request", () => {
+  const mt = constantJson({ timestamps: [] });
+  assert.throws(
+    () => new SmardClient({ baseUrl: "file:///etc/passwd", transport: mt.transport }),
+    (err: unknown) => err instanceof SmardNetworkError && /Unsupported protocol "file:"/.test(err.message),
+  );
+  assert.equal(mt.calls.length, 0);
 });

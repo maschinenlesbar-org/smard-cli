@@ -45,6 +45,27 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
 }
 
 /**
+ * commander value-parser for `--base-url`: an absolute http(s) URL. A `file:`,
+ * `ftp:` or malformed value is a usage error at parse time, before any client is
+ * built. The engine and the default transport reject a non-http(s) scheme too,
+ * but this surfaces the mistake up front and independently of the transport.
+ */
+export function parseBaseUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new InvalidArgumentError("Expected an absolute http(s) URL.");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new InvalidArgumentError(
+      `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`,
+    );
+  }
+  return value;
+}
+
+/**
  * Parse a positional argument as a non-negative integer (commander does not run
  * value-parsers on positional args). Throws a SmardError so run() prints a clear
  * message and exits 1.

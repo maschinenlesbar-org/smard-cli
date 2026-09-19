@@ -209,3 +209,13 @@ test("an unknown option (no command) still errors with exit 1", async () => {
   assert.equal(code, 1);
   assert.match(cli.err.join("\n"), /unknown option '--bogus-opt'/);
 });
+
+test("a non-http(s) or malformed --base-url is a usage error before any request", async () => {
+  for (const bad of ["file:///etc/passwd", "ftp://example.org", "notaurl"]) {
+    const cli = makeCli(() => jsonResponse({ timestamps: [] }));
+    const code = await run(["--base-url", bad, "timestamps", "410", "DE", "hour"], cli.deps);
+    assert.notEqual(code, 0, bad);
+    assert.equal(cli.mt.calls.length, 0, `${bad} must not reach the transport`);
+    assert.match(cli.err.join("\n"), /--base-url/, bad);
+  }
+});

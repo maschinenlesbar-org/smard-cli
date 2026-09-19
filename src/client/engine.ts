@@ -63,6 +63,29 @@ function sanitizeServerText(text: string): string {
   return out;
 }
 
+/**
+ * Reject a base URL whose scheme is not http(s). The default transport already
+ * gates this per hop, but the engine is exported as a library and may be handed a
+ * custom transport that does no such check, so gate the configured base URL here
+ * too (a `file:`/`ftp:` base URL fails fast with a typed error). A malformed base
+ * URL (e.g. a stray `notaurl`) gets a clear message naming only the offending
+ * value, instead of an opaque "Invalid URL" carrying a request path that reads as
+ * if the path were at fault.
+ */
+function assertHttpScheme(baseUrl: string): void {
+  let url: URL;
+  try {
+    url = new URL(baseUrl);
+  } catch {
+    throw new SmardNetworkError(`Invalid base URL: ${JSON.stringify(baseUrl)}`);
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new SmardNetworkError(
+      `Unsupported protocol "${url.protocol}" in base URL: ${baseUrl}`,
+    );
+  }
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -81,6 +104,7 @@ export class RequestEngine {
     // relative URLs that later fail with an opaque "Invalid URL".
     const baseUrl = options.baseUrl?.trim() ? options.baseUrl : DEFAULT_BASE_URL;
     this.baseUrl = baseUrl.replace(/\/+$/, "");
+    assertHttpScheme(this.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
     // Treat an empty/blank User-Agent as "use the default": some endpoints serve
     // an HTML challenge page (not JSON) when no User-Agent is sent.
@@ -94,15 +118,7 @@ export class RequestEngine {
 
   /** Build a fully-qualified URL from a path and optional query parameters. */
   buildUrl(path: string, query?: QueryParams): string {
-    // Validate the base URL up front so a malformed `baseUrl` (e.g. a stray
-    // `--base-url notaurl`) yields a clear message naming the offending value,
-    // instead of an opaque "Invalid URL" that carries the full request path and
-    // reads as if the path were at fault.
-    try {
-      new URL(this.baseUrl);
-    } catch {
-      throw new SmardNetworkError(`Invalid base URL: ${JSON.stringify(this.baseUrl)}`);
-    }
+    // The base URL was validated (absolute, http(s)) in the constructor.
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const qs = query ? buildQueryString(query) : "";
     return `${this.baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;

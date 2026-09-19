@@ -114,15 +114,15 @@ src/
   driven in-process by tests with a mocked client and captured output — no subprocesses.
 - The API accepts any integer filter id, so the CLI accepts any integer and uses the `FILTERS`
   catalogue only for the `filters` listing and documentation.
-- **Network policy (deliberate blueprint divergences).** Redirects are **never
-  followed**: any `3xx` falls into the non-2xx branch and surfaces as a
+- **Network policy.** Redirects are **never followed** (a deliberate blueprint
+  divergence): any `3xx` falls into the non-2xx branch and surfaces as a
   `SmardApiError`, so there is no cross-origin hop on which anything could leak
   (and, being keyless, nothing to leak). The `http:`/`https:` **scheme allowlist**
-  lives in the **default transport** (`http.ts`), not in the `--base-url` option
-  parser, so a `file:`/`ftp:` base URL is rejected before any request is made, but
-  it exits `1` (as `SmardNetworkError`) rather than the blueprint's parse-time
-  exit `2`. A library caller that injects a custom `Transport` is responsible for
-  its own scheme policy.
+  is enforced in three places, as in the sibling CLIs: the `--base-url` option
+  parser (`parseBaseUrl`) makes a `file:`/`ftp:`/malformed value a usage error at
+  parse time; the `RequestEngine` constructor rejects a non-http(s) base URL with a
+  `SmardNetworkError`, so a library caller's custom `Transport` never receives one;
+  and the default transport (`http.ts`) checks every request URL.
 
 ### Library / technical terms
 

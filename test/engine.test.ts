@@ -27,16 +27,30 @@ test("buildUrl normalises the path and appends the query", () => {
   );
 });
 
-test("buildUrl rejects a malformed base URL with a clear, base-only message", () => {
-  const e = new RequestEngine({ baseUrl: "notaurl" });
+test("a malformed base URL is rejected at construction with a clear, base-only message", () => {
+  const mt = makeMockTransport(() => jsonResponse({}));
   assert.throws(
-    () => e.buildUrl("/app/chart_data/410/DE/index_hour.json"),
+    () => new RequestEngine({ baseUrl: "notaurl", transport: mt.transport }),
     (err: unknown) =>
       err instanceof SmardNetworkError &&
       /Invalid base URL: "notaurl"/.test(err.message) &&
-      // the diagnostic must NOT carry the request path (which read as if it were at fault)
+      // the diagnostic must NOT carry a request path (which read as if it were at fault)
       !/chart_data/.test(err.message),
   );
+  assert.equal(mt.calls.length, 0);
+});
+
+test("a non-http(s) base URL is rejected at construction, even with a custom transport", () => {
+  for (const bad of ["file:///etc/passwd", "ftp://example.org/"]) {
+    const mt = makeMockTransport(() => jsonResponse({}));
+    assert.throws(
+      () => new RequestEngine({ baseUrl: bad, transport: mt.transport }),
+      (err: unknown) =>
+        err instanceof SmardNetworkError && /Unsupported protocol/.test(err.message),
+      bad,
+    );
+    assert.equal(mt.calls.length, 0, `${bad} must not reach the transport`);
+  }
 });
 
 test("getJson parses a JSON body", async () => {
