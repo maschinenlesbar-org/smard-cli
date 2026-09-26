@@ -252,3 +252,23 @@ test("--max-retries is bounded to 0..10", async () => {
     }
   }
 });
+
+test("--base-url with a query or fragment is a usage error before any request", async () => {
+  for (const base of ["http://127.0.0.1:18132/prefix?x=1", "http://127.0.0.1:18132/prefix#frag"]) {
+    const cli = makeCli(() => jsonResponse({ timestamps: [1] }));
+    const code = await run(["--base-url", base, "series", "99", "DE", "hour", "1"], cli.deps);
+    assert.equal(code, 1, base);
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), /A base URL cannot have a query \(\?\) or fragment \(#\)\./);
+  }
+});
+
+test("userinfo in --base-url is sent but redacted in error messages", async () => {
+  const cli = makeCli(() => jsonResponse({}, 404));
+  const code = await run(["--base-url", "http://user:secretpw@127.0.0.1:18132", "series", "21", "DE", "hour", "1"], cli.deps);
+  assert.equal(code, 4);
+  assert.ok(cli.mt.last().url.startsWith("http://user:secretpw@127.0.0.1:18132/"));
+  const stderr = cli.err.join("\n");
+  assert.ok(!stderr.includes("secretpw"), stderr);
+  assert.match(stderr, /^Error: HTTP 404 for GET http:\/\/\*\*\*@127\.0\.0\.1:18132\/app\/chart_data\/21\/DE\/21_DE_hour_1\.json$/);
+});

@@ -13,6 +13,7 @@ export {
   SmardNetworkError,
   SmardResponseTooLargeError,
   SmardParseError,
+  redactUrl,
 } from "./errors.js";
 
 export * from "./enums.js";

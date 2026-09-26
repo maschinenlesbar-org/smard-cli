@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { InvalidArgumentError } from "commander";
-import { requireInt, parseIntArg, toEngineOptions } from "../src/cli/shared.js";
+import { requireInt, parseBaseUrl, parseIntArg, toEngineOptions } from "../src/cli/shared.js";
 import { SmardError } from "../src/client/errors.js";
 
 test("requireInt accepts a plain non-negative decimal integer", () => {
@@ -49,4 +49,18 @@ test("toEngineOptions propagates only the set global options", () => {
       maxResponseBytes: 0,
     },
   );
+});
+
+test("parseBaseUrl rejects a query, fragment or surrounding whitespace", () => {
+  for (const [bad, msg] of [
+    ["http://127.0.0.1:18132/prefix?x=1", /query \(\?\) or fragment \(#\)/],
+    ["http://127.0.0.1:18132/prefix#frag", /query \(\?\) or fragment \(#\)/],
+    ["https://www.smard.de/?", /query \(\?\) or fragment \(#\)/],
+    [" https://www.smard.de", /surrounding whitespace/],
+    ["https://www.smard.de ", /surrounding whitespace/],
+  ] as const) {
+    assert.throws(() => parseBaseUrl(bad), (e: unknown) => e instanceof InvalidArgumentError && msg.test(e.message), bad);
+  }
+  assert.equal(parseBaseUrl("https://mirror.example/smard/"), "https://mirror.example/smard/");
+  assert.equal(parseBaseUrl("http://user:pw@127.0.0.1:1"), "http://user:pw@127.0.0.1:1");
 });

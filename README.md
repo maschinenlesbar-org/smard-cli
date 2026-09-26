@@ -176,7 +176,7 @@ These apply to every command and may be given before *or* after it:
 | `-V, --version` | Print the version number |
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
-| `--base-url <url>` | API base URL (default `https://www.smard.de`) |
+| `--base-url <url>` | API base URL (default `https://www.smard.de`; an `http:`/`https:` URL, optionally with a path prefix; a query `?`, fragment `#` or surrounding whitespace is a usage error). Userinfo (`https://user:pw@mirror`) is sent as Basic auth and shown as `***` in error messages |
 | `--timeout <ms>` | Time limit per request in ms, reading the whole response included (`0` = no timeout; default `30000`; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses (`0`–`10`, default `2`). Each retry waits the server's `Retry-After` (up to 30 s; a longer one is not retried) or else backs off linearly |

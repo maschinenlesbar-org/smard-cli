@@ -125,7 +125,11 @@ src/
   parser (`parseBaseUrl`) makes a `file:`/`ftp:`/malformed value a usage error at
   parse time; the `RequestEngine` constructor rejects a non-http(s) base URL with a
   `SmardNetworkError`, so a library caller's custom `Transport` never receives one;
-  and the default transport (`http.ts`) checks every request URL.
+  and the default transport (`http.ts`) checks every request URL. A base URL with a
+  query (`?`) or fragment (`#`) is refused in the parser and the engine (the API
+  path is appended to it as a string), and so is surrounding whitespace in the
+  parser. Userinfo (`https://user:pw@mirror`) is kept and sent as Basic auth, but
+  `redactUrl` shows it as `***` in every error message and in `SmardApiError.url`.
 
 ### Library / technical terms
 

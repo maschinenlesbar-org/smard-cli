@@ -131,3 +131,16 @@ test("a file: base URL is rejected when the client is constructed, before any re
   );
   assert.equal(mt.calls.length, 0);
 });
+
+test("a base URL with a query or fragment is rejected at construction (userinfo redacted)", () => {
+  for (const base of ["https://www.smard.de/?x=1", "https://u:secret@www.smard.de/#f"]) {
+    assert.throws(
+      () => new SmardClient({ baseUrl: base, transport: constantJson({}).transport }),
+      (err: unknown) =>
+        err instanceof SmardNetworkError &&
+        /^Base URL must not contain a query or fragment: /.test(err.message) &&
+        !err.message.includes("secret"),
+      base,
+    );
+  }
+});
