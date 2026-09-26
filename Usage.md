@@ -164,9 +164,11 @@ window (3 positional args: `filter region timestamp`, no resolution).
 smard table 410 DE <timestamp>
 ```
 
-Note: `table_data` windows are a **different** timestamp set than the one
-`timestamps` returns, and the public API has no discovery endpoint for them, so a
-`table` call may `404` for a timestamp that is valid for `series`/`latest`.
+Note: `table_data` has no discovery endpoint, and SMARD seems to have stopped
+publishing it. Checked 2026-09-26: windows from 2021 to October 2023 answer (with
+the weekly window starts `timestamps` lists, e.g. `smard table 410 DE
+1698012000000`), every window from December 2024 on returns a `404`, for `DE` and
+`DE-LU` alike. For anything recent, use `series`/`latest`.
 
 ### 10. Pretty vs. compact, and saving for later
 

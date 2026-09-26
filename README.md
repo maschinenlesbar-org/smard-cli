@@ -84,12 +84,14 @@ resolutions                                              valid resolution values
 | --- | --- |
 | `--group <group>` | Only show one group: `generation`, `consumption`, `price`, or `forecast` |
 
-> **Note on `table` timestamps:** `table` reads the separate `table_data`
-> endpoint. Its valid window timestamps are **not** the same set returned by
-> `timestamps` (which lists `chart_data` windows). In particular `table_data`
-> **lags** `chart_data`: the newest `timestamps` windows usually have no
-> `table_data` yet, so passing a recent timestamp will `404`. Use an older window
-> (e.g. a timestamp from earlier in the `timestamps` list) — those resolve fine.
+> **Note on `table`:** `table` reads the separate `table_data` endpoint, which
+> has no index of its own. SMARD seems to have **stopped publishing it**: in a
+> check on 2026-09-26, windows from 2021 to October 2023 answered (with the same
+> weekly window starts that `timestamps` lists), but every window from December
+> 2024 on — including the newest — returned `404`, for `DE` and `DE-LU` alike. The
+> cut-off lies between October 2023 and December 2024. So a `404` from `table` for
+> a recent window is the normal case, not a wrong timestamp; for current data use
+> `series`/`latest`.
 
 ## Common tasks
 

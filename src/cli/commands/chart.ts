@@ -43,7 +43,9 @@ export function registerChartCommands(program: Command, deps: CliDeps): void {
 
   program
     .command("table <filter> <region> <timestamp>")
-    .description("Get quarter-hour table_data for one window")
+    .description(
+      "Get quarter-hour table_data for one window (SMARD has none for windows from late 2024 on: expect a 404)",
+    )
     .action(
       action(deps, async ({ client, global }, [filter, region, timestamp]) => {
         const f = requireInt(filter!, "filter");

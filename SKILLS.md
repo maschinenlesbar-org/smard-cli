@@ -101,8 +101,8 @@ encode the non-obvious parts of this API, for example:
 - **nuclear (filter `1224`) is a dead series** — Germany shut its last reactors in April
   2023, so its last non-null value is a stale `0`; the mix skill omits/labels it rather
   than reporting it as live (see **smard-generation-mix**);
-- **`table` is effectively unreachable** — `table_data` uses a *different, undiscoverable*
-  timestamp set (a `table` call `404`s on every `timestamps`/`series` timestamp tested),
+- **`table` has no current data** — SMARD seems to have stopped publishing `table_data`
+  (windows up to October 2023 answer, every window from December 2024 on `404`s),
   so the export skill stays on `series`/`latest`;
 - **one data file covers a long span** (an `hour` window ≈ a week; a `day` window ≈ a
   year), and adjacent windows abut, so the export skill fetches only the windows it needs

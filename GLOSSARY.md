@@ -193,10 +193,11 @@ one call.
 timestamp and fetches that window in one call.
 
 **table.** `smard table <filter> <region> <timestamp>` /
-`client.tableData(...)` — quarter-hour `table_data` for one window. Its valid
-timestamps are a **different set** from those returned by `timestamps` (which
-lists `chart_data` windows); there is no discovery endpoint for `table_data`
-timestamps, so a `table` call may `404` for a timestamp valid for `series`.
+`client.tableData(...)` — quarter-hour `table_data` for one window. There is no
+discovery endpoint for `table_data`, and SMARD seems to have stopped publishing it:
+checked 2026-09-26, windows from 2021 to October 2023 answer (keyed by the weekly
+window starts `timestamps` lists), every window from December 2024 on returns a
+`404`. A `404` from `table` for a recent window is therefore expected.
 
 **filters / regions / resolutions.** Catalogue commands that print the
 documented filter ids (optionally one `--group`), the valid region codes and the

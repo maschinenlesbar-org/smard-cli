@@ -128,6 +128,6 @@ Offer JSON (`{ timestamp, value }[]`) as an alternative, and offer a wider/longe
 - **One file covers a long span** — fetch only the windows you need, not the whole index.
 - **A 404 (exit `4`) means "not a window start"** (or no data for the triple), not
   "too old": old windows stay available. Take timestamps from the `timestamps` list.
-- **Don't use `table`** for bulk export — its `table_data` timestamps are a *different,
-  undiscoverable* set (a `table` call 404s on `timestamps`/`series` timestamps), so it's
-  unreliable for ranged export. Stick to `series`/`latest`.
+- **Don't use `table`** for export — SMARD seems to have stopped publishing `table_data`
+  (windows up to October 2023 answer, every window from December 2024 on 404s), so it
+  has nothing recent. Stick to `series`/`latest`.

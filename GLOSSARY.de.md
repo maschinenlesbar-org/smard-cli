@@ -191,11 +191,12 @@ ab, nehmen den letzten Zeitstempel und laden dann diese Datei – genau das erle
 wählt und dieses Fenster in einem Aufruf abruft.
 
 **table.** `smard table <filter> <region> <timestamp>` /
-`client.tableData(...)` – Viertelstunden-`table_data` für ein Fenster. Die gültigen
-Zeitstempel dafür sind eine **andere Menge** als die von `timestamps` (das
-`chart_data`-Fenster auflistet); für `table_data`-Zeitstempel gibt es keinen
-Discovery-Endpoint, daher kann ein `table`-Aufruf mit `404` scheitern, obwohl der
-Zeitstempel für `series` gültig ist.
+`client.tableData(...)` – Viertelstunden-`table_data` für ein Fenster. Für
+`table_data` gibt es keinen Discovery-Endpoint, und SMARD veröffentlicht es
+offenbar nicht mehr: Bei einer Prüfung am 26.09.2026 antworteten Fenster von 2021
+bis Oktober 2023 (mit denselben wöchentlichen Fensteranfängen, die `timestamps`
+auflistet), jedes Fenster ab Dezember 2024 lieferte `404`. Ein `404` von `table`
+für ein aktuelles Fenster ist daher zu erwarten.
 
 **filters / regions / resolutions.** Katalogbefehle, die die dokumentierten Filter-IDs
 (optional nur eine `--group`), die gültigen Regionscodes und die gültigen Auflösungswerte
