@@ -4,7 +4,7 @@
 
 import { nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { SmardApiError, SmardNetworkError, SmardParseError, redactUrl } from "./errors.js";
+import { SmardApiError, SmardError, SmardNetworkError, SmardParseError, redactUrl } from "./errors.js";
 
 export const DEFAULT_BASE_URL = "https://www.smard.de";
 const DEFAULT_USER_AGENT = "smard-cli";
@@ -160,10 +160,25 @@ export class RequestEngine {
     this.sleep = options.sleep ?? realSleep;
   }
 
-  /** Build a fully-qualified URL from a path and optional query parameters. */
+  /**
+   * Build a fully-qualified URL from a path and optional query parameters.
+   *
+   * Throws a SmardError for a path with a "." or ".." segment. The client puts its
+   * arguments into the path with `encodeURIComponent`, which leaves those two
+   * unchanged, and URL parsing then resolves them (a region of ".." would request
+   * `/app/chart_data/410/index_hour.json`). Neither can name a filter, region or
+   * window. (Percent-encoded forms such as "%2e%2e" are safe: encodeURIComponent
+   * turns their "%" into "%25".)
+   */
   buildUrl(path: string, query?: QueryParams): string {
     // The base URL was validated (absolute, http(s)) in the constructor.
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    const dotSegment = normalizedPath.split("/").find((s) => s === "." || s === "..");
+    if (dotSegment !== undefined) {
+      throw new SmardError(
+        `Invalid path segment "${dotSegment}" in ${normalizedPath}: "." and ".." cannot be used as an id.`,
+      );
+    }
     const qs = query ? buildQueryString(query) : "";
     return `${this.baseUrl}${normalizedPath}${qs ? `?${qs}` : ""}`;
   }

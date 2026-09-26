@@ -16,7 +16,14 @@ import type { Region, Resolution } from "./enums.js";
 import type { SeriesResult, TableResult } from "./types.js";
 import { SmardError, SmardParseError } from "./errors.js";
 
-const enc = encodeURIComponent;
+/**
+ * Escape one interpolated path piece. Every argument goes through it — not only
+ * `region` — because the client does not validate its arguments (the CLI does), so
+ * a JS caller's `resolution` of `"hour/../../admin?x="` or a string `filter` would
+ * otherwise steer the request to another path, query or fragment. A `.`/`..` segment,
+ * which escaping leaves unchanged, is refused by the engine's `buildUrl`.
+ */
+const enc = (value: string | number): string => encodeURIComponent(String(value));
 
 /** A non-null, non-array JSON object. */
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -32,7 +39,7 @@ export class SmardClient {
 
   /** The timestamps (window starts) available for a (filter, region, resolution). */
   async timestamps(filter: number, region: Region, resolution: Resolution): Promise<number[]> {
-    const path = `/app/chart_data/${filter}/${enc(region)}/index_${resolution}.json`;
+    const path = `/app/chart_data/${enc(filter)}/${enc(region)}/index_${enc(resolution)}.json`;
     const res = await this.engine.getJson<unknown>(path);
     // SMARD answers a (filter, region, resolution) without data with a 404, never
     // with an empty or absent index, so anything but `{"timestamps": [...]}` (null,
@@ -45,11 +52,10 @@ export class SmardClient {
       );
     }
     // Validate the *element* type, not just that `timestamps` is an array. A
-    // later request interpolates a chosen element unencoded into the path of a
-    // follow-up GET (`series()` in `latest()`), so a hostile/MITM'd origin that
-    // returned a string element such as `"x#"` or `"1/../evil"` could steer the
-    // second request to an arbitrary same-origin path. Requiring safe integers
-    // makes such a value un-injectable at the trust boundary.
+    // later request interpolates a chosen element into the path of a follow-up
+    // GET (`series()` in `latest()`). `series()` escapes it, but a string element
+    // such as `"x#"` or `"1/../evil"` from a hostile/MITM'd origin is never a
+    // window start; requiring safe integers rejects it at the trust boundary.
     if (!ts.every((t) => typeof t === "number" && Number.isSafeInteger(t))) {
       throw new SmardParseError(
         `Malformed index from ${path}: "timestamps" contains a non-integer element.`,
@@ -66,7 +72,7 @@ export class SmardClient {
     timestamp: number,
   ): Promise<SeriesResult> {
     return this.engine.getJson(
-      `/app/chart_data/${filter}/${enc(region)}/${filter}_${enc(region)}_${resolution}_${timestamp}.json`,
+      `/app/chart_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_${enc(resolution)}_${enc(timestamp)}.json`,
     );
   }
 
@@ -89,7 +95,7 @@ export class SmardClient {
   /** Quarter-hour `table_data` for one window (richer per-point versions). */
   tableData(filter: number, region: Region, timestamp: number): Promise<TableResult> {
     return this.engine.getJson(
-      `/app/table_data/${filter}/${enc(region)}/${filter}_${enc(region)}_quarterhour_${timestamp}.json`,
+      `/app/table_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_quarterhour_${enc(timestamp)}.json`,
     );
   }
 }

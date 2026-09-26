@@ -75,8 +75,12 @@ The `FILTERS` array and the `RegionValues` / `ResolutionValues` enums are export
 > `filter` / `region` / `resolution` / `timestamp` arguments — all input
 > validation (non-negative integers, enum membership) lives in the CLI layer.
 > The `Region` / `Resolution` types are compile-time hints only; an arbitrary
-> string cast to `Region` is merely `encodeURIComponent`-escaped, not checked
-> against `RegionValues`. Validate untrusted input yourself before calling.
+> string cast to `Region` or `Resolution` is merely `encodeURIComponent`-escaped,
+> not checked against `RegionValues` / `ResolutionValues`. Every argument —
+> `filter` and `timestamp` too, should a JS caller pass a string — is escaped the
+> same way, so none can add a path segment, query or fragment, and a `.` / `..`
+> segment is refused (`SmardError`, no request). Validate untrusted input yourself
+> before calling.
 >
 > Likewise, the **response** types (`SeriesResult` / `TableResult`) are a typed
 > **pass-through**: any successful (2xx) JSON body is parsed and returned cast to
@@ -178,7 +182,9 @@ exhaustive: the API accepts any integer filter id.
 **Validation boundary.** All input validation (non-negative integers, enum
 membership) lives in the **CLI** layer. `SmardClient` performs **no** validation;
 a `Region`/`Resolution` is a compile-time hint only, merely
-`encodeURIComponent`-escaped, not checked against the value arrays.
+`encodeURIComponent`-escaped, not checked against the value arrays. Every path
+argument (`filter`, `region`, `resolution`, `timestamp`) is escaped, and the
+engine's `buildUrl` refuses a `.`/`..` segment.
 
 **Typed pass-through.** Response types (`SeriesResult`, `TableResult`) are a
 convenience typing over the documented shape, not a runtime guarantee. The one
@@ -187,9 +193,9 @@ exception is `timestamps()`, which checks that the body is a JSON object whose
 `SmardParseError` — `null`, an array, `{}` or `timestamps: null` are not "no data",
 which SMARD reports as a 404). The
 element-type check is a security boundary: `latest()` interpolates a chosen
-element unencoded into the path of a follow-up `series()` request, so a hostile
-or MITM'd origin returning a string element (e.g. `"1/../evil"`) could otherwise
-steer that request to an arbitrary same-origin path.
+element into the path of a follow-up `series()` request, so a hostile or MITM'd
+origin's string element (e.g. `"1/../evil"`) is refused before it gets there
+(`series()` escapes every argument as well).
 
 ## Testing
 
