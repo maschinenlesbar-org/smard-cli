@@ -1,6 +1,6 @@
 {
   "name": "smard",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "German electricity-market intelligence skills powered by the smard-cli (Bundesnetzagentur SMARD chart-data API).",
   "author": {
     "name": "Sebastian Schürmann",
