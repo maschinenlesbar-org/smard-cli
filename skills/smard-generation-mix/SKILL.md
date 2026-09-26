@@ -134,5 +134,6 @@ Rules:
   filter (4387). Don't add 4070 into generation totals.
 - **Region matters for totals.** Summing the four TSO areas ≈ `DE`, but just query `DE`
   for the national mix rather than adding control areas yourself.
-- A `latest` for a valid triple that has no data returns an empty `series` (or all-null);
-  say "no settled data for this window" rather than reporting 0 MWh.
+- A triple without data is a 404 (exit `4`), not an empty result; a newest window whose
+  values are all `null` means no settled data yet — say "no settled data for this
+  window" rather than reporting 0 MWh.

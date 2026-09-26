@@ -113,9 +113,10 @@ smard latest 4359 DE week    # Stromverbrauch: Residuallast (residual load)
 
 ### 6. Fetch one explicit window (timestamps → series)
 
-Why: pull a specific historical window rather than the newest one. Available
-windows roll over time, so read a current timestamp from `timestamps` instead of
-hard-coding one (stale timestamps return a 404).
+Why: pull a specific historical window rather than the newest one. Take the
+timestamp from `timestamps`: only a listed window start works, any other value
+returns a 404. Old windows stay available (the `4169 DE-LU hour` index goes back
+to 2018), so a timestamp read once from the list keeps working.
 
 ```bash
 smard timestamps 4169 DE-LU hour          # -> [ ..., <valid epoch-ms timestamps> ]

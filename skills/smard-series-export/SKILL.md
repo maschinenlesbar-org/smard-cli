@@ -62,7 +62,8 @@ the date range the user asked for.
 smard --compact timestamps 410 DE hour | jq '.[-4:]'
 ```
 
-An empty `[]` means no data for that triple — verify filter/region/resolution are valid.
+A triple without data is a **404 (exit `4`)**, not an empty `[]` — then verify
+filter/region/resolution with `smard filters` / `smard regions`.
 
 ## Step 3 — Fetch each window and stitch
 
@@ -125,7 +126,8 @@ Offer JSON (`{ timestamp, value }[]`) as an alternative, and offer a wider/longe
 - **Null tail + mid-series gaps** — drop or keep deliberately, never coerce to 0 (Step 3).
 - **Window overlap at boundaries** — de-duplicate on timestamp when stitching.
 - **One file covers a long span** — fetch only the windows you need, not the whole index.
-- **Stale timestamps 404** (exit `4`); read a fresh list from `timestamps`, don't hard-code.
+- **A 404 (exit `4`) means "not a window start"** (or no data for the triple), not
+  "too old": old windows stay available. Take timestamps from the `timestamps` list.
 - **Don't use `table`** for bulk export — its `table_data` timestamps are a *different,
   undiscoverable* set (a `table` call 404s on `timestamps`/`series` timestamps), so it's
   unreliable for ranged export. Stick to `series`/`latest`.

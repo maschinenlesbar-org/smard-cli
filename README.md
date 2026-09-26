@@ -113,7 +113,7 @@ smard --compact latest 4068 DE hour
 smard latest 4067 DE hour    # Wind Onshore
 smard latest 1225 DE hour    # Wind Offshore
 
-# Pick a specific window explicitly (available timestamps roll over — don't hard-code one)
+# Pick a specific window explicitly (any timestamp from the list; old windows stay available)
 TS=$(smard --compact timestamps 4169 DE-LU hour | jq '.[-1]')
 smard series 4169 DE-LU hour "$TS"
 ```
@@ -148,7 +148,7 @@ both `smard --compact latest …` and `smard latest … --compact` do the same t
 | Code | Meaning |
 | --- | --- |
 | `0` | success (also `--help` / `--version`) |
-| `4` | resource not found (`404`) — e.g. a stale timestamp or unknown filter/region combination |
+| `4` | resource not found (`404`) — a timestamp that is not a window start, or a filter/region/resolution combination without data |
 | `1` | any other error: network failure, timeout, parse error, non-404 API status |
 | non-zero | usage / invalid argument (bad region, non-integer filter, etc.) |
 
@@ -157,15 +157,18 @@ both `smard --compact latest …` and `smard latest … --compact` do the same t
 - **`command not found: smard`** — the global npm bin directory isn't on your
   `PATH`. Run `npm bin -g` to find it and add it, or run via
   `npx @maschinenlesbar.org/smard-cli …`.
-- **Exit `4` / "not found"** — the timestamp or filter/region/resolution
-  combination doesn't exist. Re-run `smard timestamps <filter> <region>
-  <resolution>` to get a fresh list; available windows roll over time. For
-  `table`, note that `table_data` timestamps differ from `chart_data` ones.
+- **Exit `4` / "not found"** — the timestamp is not a window start, or the
+  filter/region/resolution combination has no data (SMARD answers both with a
+  `404`; it never returns an empty list). Take a timestamp from `smard timestamps
+  <filter> <region> <resolution>` — old windows stay available, so a timestamp
+  from that list keeps working — and check the combination with `smard regions`
+  and `smard filters`. For `table`, see the `table_data` note above.
 - **Exit `1` / network error** — connectivity, DNS, or a timeout. Try again,
   or raise the limit with `--timeout 60000`.
-- **`smard timestamps` returns an empty array** — the API has no data for that
-  filter/region/resolution combination. Verify with `smard regions` and
-  `smard filters` that your values are valid.
+- **Exit `1` with "Unexpected response shape"** — the index was not
+  `{"timestamps": [...]}` (an error page from a proxy, or a changed format), so
+  the CLI refuses to read it as "no data". `latest` also exits `1` if an index
+  lists no windows at all.
 
 ## Global options
 

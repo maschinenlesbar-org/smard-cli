@@ -177,5 +177,5 @@ Rules:
   points may already be "tomorrow's" — label the date from the timestamp and don't report
   them as the current price.
 - Negative prices are valid; don't clamp or treat as errors.
-- A 404 (exit code `4`) on `series` means a stale/invalid timestamp — re-run `timestamps`;
-  prefer `latest` to avoid hard-coding one.
+- A 404 (exit code `4`) on `series` means the timestamp is not a window start (old
+  windows stay available) — take one from `timestamps`, or use `latest`.
