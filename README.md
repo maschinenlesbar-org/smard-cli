@@ -42,9 +42,11 @@ No setup needed — the API requires no key. Your first query:
 smard latest 410 DE week
 ```
 
-That fetches the newest week of total grid load for Germany. The result is a
-JSON object: time-series values live under `series`, metadata under `meta_data`.
-Pull out just the series with `jq`:
+That fetches the newest `week` file of total grid load for Germany: one value per
+week for the current year (52 weekly totals, the weeks still to come as `null`). An
+`hour` or `quarterhour` file covers one week; a `day`, `week` or `month` file covers
+a year. The result is a JSON object: time-series values live under `series`,
+metadata under `meta_data`. Pull out just the series with `jq`:
 
 ```bash
 smard latest 410 DE week | jq '.series'
@@ -102,7 +104,7 @@ use-case-driven set.
 # What filter ids exist? Show just the consumption group
 smard filters --group consumption
 
-# Newest week of total grid load for Germany
+# Total grid load for Germany, one value per week of the current year
 smard latest 410 DE week
 
 # Newest hourly wholesale price for the DE-LU bidding zone (EUR/MWh)
