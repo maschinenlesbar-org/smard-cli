@@ -189,7 +189,7 @@ recommended):
 | `--base-url <url>` | API base URL (default `https://www.smard.de`) |
 | `--timeout <ms>` | time limit per request in ms, whole response included (`0` = no timeout; default `30000`; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value |
-| `--max-retries <n>` | retries for transient `429`/`503` responses (default `2`) |
+| `--max-retries <n>` | retries for transient `429`/`503` responses (`0`–`10`, default `2`; each waits the server's `Retry-After`, up to 30 s) |
 | `--max-response-bytes <n>` | cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 | `--compact` | print JSON on a single line instead of pretty-printed |
 | `-h, --help` | help for the program or a command (`smard <command> --help`) |

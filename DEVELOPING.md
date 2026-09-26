@@ -58,7 +58,7 @@ try {
 new SmardClient({
   baseUrl: "https://www.smard.de",
   timeoutMs: 15_000,
-  maxRetries: 3,              // 429 / 503 are retried with linear backoff
+  maxRetries: 3,              // 429 / 503 are retried (Retry-After, else linear backoff)
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",
   transport: customTransport, // inject your own HTTP transport
@@ -149,8 +149,12 @@ Lets the whole CLI run in tests with a mocked client and captured output — no
 subprocess.
 
 **Retry / backoff.** The engine automatically retries transient `429`
-(rate-limited) and `503` responses with **linear** backoff, up to `--max-retries`
-(default `2`). `SmardApiError.isRetryable` flags these statuses.
+(rate-limited) and `503` responses, up to `--max-retries` (default `2`; `0`–`10` in
+the CLI). Each retry waits the response's `Retry-After` — delay-seconds or an
+IMF-fixdate HTTP-date, parsed by `parseRetryAfter` — or, without a usable one,
+`retryDelayMs * attempt` (linear backoff). A `Retry-After` longer than
+`MAX_RETRY_AFTER_MS` (30 s) is not retried: the `SmardApiError` surfaces at once.
+`SmardApiError.isRetryable` flags these statuses.
 
 **maxResponseBytes.** A hard cap (default 100 MiB; `0` = unlimited) on response
 body size, defending against memory exhaustion; a breach aborts the request with
