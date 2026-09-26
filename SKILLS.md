@@ -96,8 +96,8 @@ encode the non-obvious parts of this API, for example:
   `{ "timestamps": […] }` — the CLI unwraps the index, so `jq '.[-1]'`, never
   `.timestamps` (see **smard-series-export**);
 - **all price series are addressed by region `DE-LU`** — the *filter id* selects the
-  country/bidding zone (France `254`, Austria `4170`, …), not the region argument;
-  `254 DE` will not give France (see **smard-price-watch**);
+  country/bidding zone (France `254`, Austria `4170`, …), not the region argument
+  (region `DE` happens to return the same series; see **smard-price-watch**);
 - **nuclear (filter `1224`) is a dead series** — Germany shut its last reactors in April
   2023, so its last non-null value is a stale `0`; the mix skill omits/labels it rather
   than reporting it as live (see **smard-generation-mix**);

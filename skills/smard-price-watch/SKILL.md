@@ -50,9 +50,10 @@ smard --compact filters --group price
 | 252 / 253 | Dänemark 1 / 2 |
 | 257 | Polen · 261 Tschechien · 4996 Belgien · 255 Italien Nord · … |
 
-**Critical:** all of these price series use **region `DE-LU`** as the region argument (the
-filter id selects the country/zone, not the region code). Querying `254 DE hour` will not
-give France — use `254 DE-LU hour`.
+**Region:** use **`DE-LU`** as the region argument for all of these price series — the
+filter id selects the country/zone, not the region code, so `254 DE-LU hour` is France.
+Region `DE` happens to mirror it (`254 DE hour` and `4169 DE hour` return the same series
+as with `DE-LU`, checked 26 Sep 2026), but `DE-LU` is the documented bidding-zone region.
 
 **Resolution: the day-ahead market is quarter-hourly** (since 1 Oct 2025; before that the
 `quarterhour` series just repeats each hourly price). The price series have 96 prices per
