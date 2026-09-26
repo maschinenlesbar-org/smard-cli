@@ -272,3 +272,21 @@ test("userinfo in --base-url is sent but redacted in error messages", async () =
   assert.ok(!stderr.includes("secretpw"), stderr);
   assert.match(stderr, /^Error: HTTP 404 for GET http:\/\/\*\*\*@127\.0\.0\.1:18132\/app\/chart_data\/21\/DE\/21_DE_hour_1\.json$/);
 });
+
+test("--user-agent rejects blank, control-character and non-Latin-1 values before any request", async () => {
+  for (const [ua, msg] of [
+    ["", /Expected a non-empty value\./],
+    ["  ", /Expected a non-empty value\./],
+    ["a\r\nX-Injected: 1", /Value contains control characters\./],
+    ["smard \u{1F642}", /Value contains characters outside Latin-1 \(above U\+00FF\)\./],
+  ] as const) {
+    const cli = makeCli(() => jsonResponse({ timestamps: [1] }));
+    const code = await run(["--user-agent", ua, "timestamps", "410", "DE", "hour"], cli.deps);
+    assert.equal(code, 1, JSON.stringify(ua));
+    assert.equal(cli.mt.calls.length, 0);
+    assert.match(cli.err.join("\n"), msg);
+  }
+  const cli = makeCli(() => jsonResponse({ timestamps: [1] }));
+  assert.equal(await run(["--user-agent", "smard-t\u00fcv\t1", "timestamps", "410", "DE", "hour"], cli.deps), 0);
+  assert.equal(cli.mt.last().headers?.["User-Agent"], "smard-t\u00fcv\t1");
+});

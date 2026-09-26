@@ -44,6 +44,37 @@ export function parseBoundedInt(min: number, max: number): (value: string) => nu
   };
 }
 
+/** commander value-parser: a non-empty (after trimming) string. */
+export function parseNonEmpty(value: string): string {
+  if (value.trim() === "") {
+    throw new InvalidArgumentError("Expected a non-empty value.");
+  }
+  return value;
+}
+
+/**
+ * commander value-parser for a value that ends up in an HTTP header (`--user-agent`).
+ * Node's HTTP layer throws an opaque "Invalid character in header content" at request
+ * time for a CR/LF (or any other C0 control or DEL) and for any character above
+ * U+00FF, which surfaced as "Unexpected error". Reject those here as a usage error,
+ * along with a blank value (which the engine would silently replace by the default).
+ * Tab is allowed, as in HTTP. Checked by char code so the source stays free of
+ * control bytes.
+ */
+export function parseHeaderValue(value: string): string {
+  parseNonEmpty(value);
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if ((c < 0x20 && c !== 0x09) || c === 0x7f) {
+      throw new InvalidArgumentError("Value contains control characters.");
+    }
+    if (c > 0xff) {
+      throw new InvalidArgumentError("Value contains characters outside Latin-1 (above U+00FF).");
+    }
+  }
+  return value;
+}
+
 /**
  * commander value-parser for `--base-url`: an absolute http(s) URL. A `file:`,
  * `ftp:` or malformed value is a usage error at parse time, before any client is
