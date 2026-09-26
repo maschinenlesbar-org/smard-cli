@@ -219,3 +219,24 @@ test("a non-http(s) or malformed --base-url is a usage error before any request"
     assert.match(cli.err.join("\n"), /--base-url/, bad);
   }
 });
+
+test("a malformed index body exits 1 with a parse error, never [] or an invented result", async () => {
+  for (const cmd of ["timestamps", "latest"]) {
+    for (const body of [null, [1, 2, 3], {}, { timestamps: null }]) {
+      const cli = makeCli(() => jsonResponse(body));
+      const code = await run(["--compact", cmd, "9", "DE", "hour"], cli.deps);
+      assert.equal(code, 1, `${cmd} ${JSON.stringify(body)}`);
+      assert.deepEqual(cli.out, []);
+      assert.match(cli.err.join("\n"), /Unexpected response shape from .*index_hour\.json/);
+    }
+  }
+});
+
+test("latest on an empty index exits 1 and prints nothing on stdout", async () => {
+  const cli = makeCli(() => jsonResponse({ timestamps: [] }));
+  const code = await run(["latest", "410", "DE", "hour"], cli.deps);
+  assert.equal(code, 1);
+  assert.deepEqual(cli.out, []);
+  assert.match(cli.err.join("\n"), /lists no windows/);
+  assert.equal(cli.mt.calls.length, 1);
+});

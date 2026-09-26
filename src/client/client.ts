@@ -13,10 +13,15 @@
 
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { Region, Resolution } from "./enums.js";
-import type { TimestampIndex, SeriesResult, TableResult } from "./types.js";
-import { SmardParseError } from "./errors.js";
+import type { SeriesResult, TableResult } from "./types.js";
+import { SmardError, SmardParseError } from "./errors.js";
 
 const enc = encodeURIComponent;
+
+/** A non-null, non-array JSON object. */
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export class SmardClient {
   private readonly engine: RequestEngine;
@@ -28,12 +33,15 @@ export class SmardClient {
   /** The timestamps (window starts) available for a (filter, region, resolution). */
   async timestamps(filter: number, region: Region, resolution: Resolution): Promise<number[]> {
     const path = `/app/chart_data/${filter}/${enc(region)}/index_${resolution}.json`;
-    const res = await this.engine.getJson<TimestampIndex>(path);
-    const ts = res?.timestamps;
-    if (ts === undefined || ts === null) return [];
+    const res = await this.engine.getJson<unknown>(path);
+    // SMARD answers a (filter, region, resolution) without data with a 404, never
+    // with an empty or absent index, so anything but `{"timestamps": [...]}` (null,
+    // an array, `{}`, `timestamps: null`) is an error page or a changed format —
+    // not "no data".
+    const ts = isObject(res) ? res.timestamps : undefined;
     if (!Array.isArray(ts)) {
       throw new SmardParseError(
-        `Malformed index from ${path}: "timestamps" is not an array.`,
+        `Unexpected response shape from ${path}: expected a JSON object with a "timestamps" array.`,
       );
     }
     // Validate the *element* type, not just that `timestamps` is an array. A
@@ -66,7 +74,10 @@ export class SmardClient {
   async latest(filter: number, region: Region, resolution: Resolution): Promise<SeriesResult> {
     const ts = await this.timestamps(filter, region, resolution);
     if (ts.length === 0) {
-      return { meta_data: { version: 0, created: 0 }, series: [] };
+      // Never invent a result: there is no newest window to fetch.
+      throw new SmardError(
+        `The index for filter ${filter}, region ${region}, resolution ${resolution} lists no windows, so there is no newest window to fetch.`,
+      );
     }
     // Take the genuinely newest timestamp rather than trusting the index order.
     // Use a reduce rather than `Math.max(...ts)`: spreading a very large index as

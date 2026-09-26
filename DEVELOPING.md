@@ -81,8 +81,11 @@ The `FILTERS` array and the `RegionValues` / `ResolutionValues` enums are export
 > Likewise, the **response** types (`SeriesResult` / `TableResult`) are a typed
 > **pass-through**: any successful (2xx) JSON body is parsed and returned cast to
 > the method's return type without structural validation. The one exception is
-> `timestamps()`, which validates that `timestamps` is an array (else throws
-> `SmardParseError`). For `series` / `latest` / `tableData`, treat the typing as a
+> `timestamps()`, which validates that the body is a JSON object with a
+> `timestamps` array of safe integers (else throws `SmardParseError`: SMARD answers
+> a triple without data with a 404, never with an empty or absent index). `latest()`
+> on an index that lists no windows throws a `SmardError` rather than returning a
+> made-up empty result. For `series` / `latest` / `tableData`, treat the typing as a
 > convenience over the documented API shape, not a runtime guarantee.
 
 ## Architecture
@@ -171,8 +174,10 @@ a `Region`/`Resolution` is a compile-time hint only, merely
 
 **Typed pass-through.** Response types (`SeriesResult`, `TableResult`) are a
 convenience typing over the documented shape, not a runtime guarantee. The one
-exception is `timestamps()`, which checks that `timestamps` is an array **and
-that every element is a safe integer** (else throws `SmardParseError`). The
+exception is `timestamps()`, which checks that the body is a JSON object whose
+`timestamps` is an array **and that every element is a safe integer** (else throws
+`SmardParseError` — `null`, an array, `{}` or `timestamps: null` are not "no data",
+which SMARD reports as a 404). The
 element-type check is a security boundary: `latest()` interpolates a chosen
 element unencoded into the path of a follow-up `series()` request, so a hostile
 or MITM'd origin returning a string element (e.g. `"1/../evil"`) could otherwise

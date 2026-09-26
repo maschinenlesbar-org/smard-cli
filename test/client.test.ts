@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SmardClient } from "../src/client/client.js";
-import { SmardApiError, SmardNetworkError, SmardParseError } from "../src/client/errors.js";
+import { SmardApiError, SmardError, SmardNetworkError, SmardParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, constantJson } from "./helpers.js";
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>): SmardClient {
@@ -40,11 +40,38 @@ test("latest reads the index then fetches the newest window", async () => {
   );
 });
 
-test("latest returns an empty series when the index is empty", async () => {
+test("timestamps passes an empty index through as []", async () => {
   const mt = constantJson({ timestamps: [] });
-  const res = await clientWith(mt).latest(410, "DE", "hour");
-  assert.deepEqual(res.series, []);
+  assert.deepEqual(await clientWith(mt).timestamps(410, "DE", "hour"), []);
+});
+
+test("latest on an empty index throws instead of inventing a result", async () => {
+  const mt = constantJson({ timestamps: [] });
+  await assert.rejects(
+    () => clientWith(mt).latest(410, "DE", "hour"),
+    (err: unknown) =>
+      err instanceof SmardError &&
+      !(err instanceof SmardParseError) &&
+      err.message ===
+        "The index for filter 410, region DE, resolution hour lists no windows, so there is no newest window to fetch.",
+  );
   assert.equal(mt.calls.length, 1); // never fetched a data file
+});
+
+test("a malformed index body is a SmardParseError, not an empty list", async () => {
+  for (const body of [null, [1, 2, 3], {}, { timestamps: null }, { timestamps: { a: 1 } }, "x", 5]) {
+    const mt = constantJson(body);
+    await assert.rejects(
+      () => clientWith(mt).timestamps(410, "DE", "hour"),
+      (err: unknown) =>
+        err instanceof SmardParseError &&
+        err.message ===
+          'Unexpected response shape from /app/chart_data/410/DE/index_hour.json: expected a JSON object with a "timestamps" array.',
+      JSON.stringify(body),
+    );
+    await assert.rejects(() => clientWith(mt).latest(410, "DE", "hour"), SmardParseError);
+    assert.equal(mt.calls.length, 2, JSON.stringify(body)); // one index request per call, no data file
+  }
 });
 
 test("a hostile timestamps element cannot steer the follow-up request path", async () => {
