@@ -55,6 +55,14 @@ export function assertArgument<T>(
   return value as T;
 }
 
+/** A rule that accepts only an integer from `min` to `max` (inclusive). */
+export function intRangeProblem(min: number, max: number): Problem<unknown> {
+  return (value) =>
+    typeof value === "number" && Number.isSafeInteger(value) && value >= min && value <= max
+      ? undefined
+      : `Expected an integer from ${min} to ${max}.`;
+}
+
 // ---- The chart-data path arguments --------------------------------------------
 
 /**

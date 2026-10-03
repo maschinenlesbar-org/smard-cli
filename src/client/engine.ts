@@ -2,9 +2,10 @@
 // requests via a Transport, applies retry/backoff for transient statuses
 // (429, 503), and decodes responses.
 
-import { nodeHttpTransport, type Transport } from "./http.js";
+import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { SmardApiError, SmardError, SmardNetworkError, SmardParseError, redactUrl } from "./errors.js";
+import { assertValid, intRangeProblem, nonNegativeIntegerProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://www.smard.de";
 const DEFAULT_USER_AGENT = "smard-cli";
@@ -24,20 +25,26 @@ export interface EngineOptions {
   userAgent?: string;
   /**
    * Time limit per request in milliseconds, covering the whole response body, not
-   * only idle gaps (0 disables; capped at MAX_TIMEOUT_MS, 2^31 - 1 ms). Defaults to 30 s.
+   * only idle gaps: an integer from 0 (no timeout) to MAX_TIMEOUT_MS (2^31 - 1 ms).
+   * Defaults to 30 s.
    */
   timeoutMs?: number;
   /**
-   * Number of automatic retries for transient (429/503) responses. Each waits the
-   * response's `Retry-After` (up to `MAX_RETRY_AFTER_MS`; a longer one is not
-   * retried), or else `retryDelayMs * attempt`.
+   * Number of automatic retries for transient (429/503) responses, an integer from
+   * 0 to MAX_RETRIES (10); defaults to 2. Each waits the response's `Retry-After`
+   * (up to `MAX_RETRY_AFTER_MS`; a longer one is not retried), or else
+   * `retryDelayMs * attempt`.
    */
   maxRetries?: number;
-  /** Base backoff between retries in milliseconds (grows linearly); used without a Retry-After. */
+  /**
+   * Base backoff between retries in milliseconds (grows linearly; a non-negative
+   * integer, default 200); used without a Retry-After.
+   */
   retryDelayMs?: number;
   /**
    * Hard cap on response body size in bytes (defends against memory exhaustion
-   * from a hostile/buggy endpoint). Defaults to 100 MiB; set to 0 for no limit.
+   * from a hostile/buggy endpoint), a non-negative integer. Defaults to 100 MiB;
+   * set to 0 for no limit.
    */
   maxResponseBytes?: number;
   /** Injectable sleep, primarily for deterministic tests. */
@@ -53,6 +60,13 @@ const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
  * out, and a hostile value must not stall the CLI.
  */
 export const MAX_RETRY_AFTER_MS = 30_000;
+
+/**
+ * The most automatic retries a client may ask for (`maxRetries`). A larger value
+ * kept polling a rate-limited SMARD; the engine rejects it with a
+ * SmardValidationError, and the CLI's `--max-retries` uses the same bound.
+ */
+export const MAX_RETRIES = 10;
 
 /** An IMF-fixdate (RFC 9110 §5.6.7), the one HTTP-date form senders must generate. */
 const IMF_FIXDATE =
@@ -153,10 +167,21 @@ export class RequestEngine {
     // Treat an empty/blank User-Agent as "use the default": some endpoints serve
     // an HTML challenge page (not JSON) when no User-Agent is sent.
     this.userAgent = options.userAgent?.trim() ? options.userAgent : DEFAULT_USER_AGENT;
-    this.timeoutMs = options.timeoutMs ?? 30_000;
-    this.maxRetries = options.maxRetries ?? 2;
-    this.retryDelayMs = options.retryDelayMs ?? 200;
-    this.maxResponseBytes = options.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
+    // The numeric options are range-checked here, not only by the CLI's parsers: a
+    // negative, NaN or fractional value would otherwise silently switch off the
+    // timeout or the size cap downstream, and Infinity would retry without bound.
+    this.timeoutMs = options.timeoutMs === undefined
+      ? 30_000
+      : assertValid("timeoutMs", options.timeoutMs, intRangeProblem(0, MAX_TIMEOUT_MS));
+    this.maxRetries = options.maxRetries === undefined
+      ? 2
+      : assertValid("maxRetries", options.maxRetries, intRangeProblem(0, MAX_RETRIES));
+    this.retryDelayMs = options.retryDelayMs === undefined
+      ? 200
+      : assertValid("retryDelayMs", options.retryDelayMs, nonNegativeIntegerProblem);
+    this.maxResponseBytes = options.maxResponseBytes === undefined
+      ? DEFAULT_MAX_RESPONSE_BYTES
+      : assertValid("maxResponseBytes", options.maxResponseBytes, nonNegativeIntegerProblem);
     this.sleep = options.sleep ?? realSleep;
   }
 

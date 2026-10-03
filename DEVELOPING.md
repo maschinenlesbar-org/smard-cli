@@ -57,8 +57,8 @@ try {
 ```ts
 new SmardClient({
   baseUrl: "https://www.smard.de",
-  timeoutMs: 15_000,
-  maxRetries: 3,              // 429 / 503 are retried (Retry-After, else linear backoff)
+  timeoutMs: 15_000,          // 0..MAX_TIMEOUT_MS (0 = no timeout)
+  maxRetries: 3,              // 0..MAX_RETRIES (10); 429 / 503 are retried (Retry-After, else linear backoff)
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",
   transport: customTransport, // inject your own HTTP transport
@@ -163,8 +163,9 @@ Lets the whole CLI run in tests with a mocked client and captured output — no
 subprocess.
 
 **Retry / backoff.** The engine automatically retries transient `429`
-(rate-limited) and `503` responses, up to `--max-retries` (default `2`; `0`–`10` in
-the CLI). Each retry waits the response's `Retry-After` — delay-seconds or an
+(rate-limited) and `503` responses, up to `maxRetries` / `--max-retries` (default
+`2`; an integer from `0` to `MAX_RETRIES`, 10 — the engine rejects anything else
+with `SmardValidationError`, and the CLI's parser uses the same constant). Each retry waits the response's `Retry-After` — delay-seconds or an
 IMF-fixdate HTTP-date, parsed by `parseRetryAfter` — or, without a usable one,
 `retryDelayMs * attempt` (linear backoff). A `Retry-After` longer than
 `MAX_RETRY_AFTER_MS` (30 s) is not retried: the `SmardApiError` surfaces at once.
@@ -173,6 +174,14 @@ IMF-fixdate HTTP-date, parsed by `parseRetryAfter` — or, without a usable one,
 **maxResponseBytes.** A hard cap (default 100 MiB; `0` = unlimited) on response
 body size, defending against memory exhaustion; a breach aborts the request with
 `SmardResponseTooLargeError`.
+
+**Engine option bounds.** The `RequestEngine` constructor (so `new SmardClient`)
+checks every numeric option that is set and throws `SmardValidationError` for a
+value out of range: `timeoutMs` an integer from `0` to `MAX_TIMEOUT_MS`,
+`maxRetries` from `0` to `MAX_RETRIES`, `maxResponseBytes` and `retryDelayMs`
+non-negative integers. `-1`, `NaN`, `1.5` or `Infinity` would otherwise silently
+switch off the timeout or the size cap, or retry without bound. `undefined` keeps
+the default, and `0` keeps its documented meaning.
 
 **Error types.** [`errors.ts`](src/client/errors.ts): `SmardApiError` (non-2xx,
 carries `status`/`detail`/`url`/`body`), `SmardNetworkError` (transport
