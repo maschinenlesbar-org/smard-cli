@@ -63,6 +63,34 @@ export function intRangeProblem(min: number, max: number): Problem<unknown> {
       : `Expected an integer from ${min} to ${max}.`;
 }
 
+// ---- Header values ---------------------------------------------------------------
+
+/**
+ * The rule for a value that goes into an HTTP header (the User-Agent): not blank,
+ * no C0 control character other than tab (so no CR/LF header injection), no DEL,
+ * and nothing above U+00FF. Node's HTTP layer would otherwise throw an opaque
+ * "Invalid character in header content" at request time, and a custom transport
+ * would receive the raw value. Checked by char code so the source stays free of
+ * control bytes.
+ */
+export const headerValueProblem: Problem<unknown> = (value) => {
+  if (typeof value !== "string" || value.trim() === "") return "Expected a non-empty value.";
+  for (let i = 0; i < value.length; i++) {
+    const c = value.charCodeAt(i);
+    if ((c < 0x20 && c !== 0x09) || c === 0x7f) return "Value contains control characters.";
+    if (c > 0xff) return "Value contains characters outside Latin-1 (above U+00FF).";
+  }
+  return undefined;
+};
+
+/**
+ * Check a header value and return it; throws `SmardValidationError`
+ * (`Invalid <name>: <reason>`).
+ */
+export function assertHeaderValue(name: string, value: unknown): string {
+  return assertValid(name, value, headerValueProblem) as string;
+}
+
 // ---- The chart-data path arguments --------------------------------------------
 
 /**

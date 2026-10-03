@@ -60,7 +60,7 @@ new SmardClient({
   timeoutMs: 15_000,          // 0..MAX_TIMEOUT_MS (0 = no timeout)
   maxRetries: 3,              // 0..MAX_RETRIES (10); 429 / 503 are retried (Retry-After, else linear backoff)
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
-  userAgent: "my-app/1.0",
+  userAgent: "my-app/1.0",    // a header value: no control characters, nothing above U+00FF
   transport: customTransport, // inject your own HTTP transport
 });
 ```
@@ -181,7 +181,12 @@ value out of range: `timeoutMs` an integer from `0` to `MAX_TIMEOUT_MS`,
 `maxRetries` from `0` to `MAX_RETRIES`, `maxResponseBytes` and `retryDelayMs`
 non-negative integers. `-1`, `NaN`, `1.5` or `Infinity` would otherwise silently
 switch off the timeout or the size cap, or retry without bound. `undefined` keeps
-the default, and `0` keeps its documented meaning.
+the default, and `0` keeps its documented meaning. A `userAgent` must be a valid
+header value (`headerValueProblem`: no C0 control character other than tab — so
+no CR/LF — no DEL, nothing above U+00FF); the constructor rejects anything else
+with `SmardValidationError`, whatever the transport, and the CLI's `--user-agent`
+parser applies the same rule. Should Node's HTTP layer still refuse a header, the
+default transport rejects with a `SmardNetworkError`, never a raw `TypeError`.
 
 **Error types.** [`errors.ts`](src/client/errors.ts): `SmardApiError` (non-2xx,
 carries `status`/`detail`/`url`/`body`), `SmardNetworkError` (transport

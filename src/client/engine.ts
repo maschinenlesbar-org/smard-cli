@@ -5,7 +5,7 @@
 import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
 import { SmardApiError, SmardError, SmardNetworkError, SmardParseError, redactUrl } from "./errors.js";
-import { assertValid, intRangeProblem, nonNegativeIntegerProblem } from "./validate.js";
+import { assertHeaderValue, assertValid, intRangeProblem, nonNegativeIntegerProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://www.smard.de";
 const DEFAULT_USER_AGENT = "smard-cli";
@@ -165,8 +165,12 @@ export class RequestEngine {
     assertHttpScheme(this.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
     // Treat an empty/blank User-Agent as "use the default": some endpoints serve
-    // an HTML challenge page (not JSON) when no User-Agent is sent.
-    this.userAgent = options.userAgent?.trim() ? options.userAgent : DEFAULT_USER_AGENT;
+    // an HTML challenge page (not JSON) when no User-Agent is sent. Any other value
+    // must be a valid header value (no CR/LF or other controls, nothing above
+    // U+00FF), whatever the transport.
+    this.userAgent = options.userAgent?.trim()
+      ? assertHeaderValue("userAgent", options.userAgent)
+      : DEFAULT_USER_AGENT;
     // The numeric options are range-checked here, not only by the CLI's parsers: a
     // negative, NaN or fractional value would otherwise silently switch off the
     // timeout or the size cap downstream, and Infinity would retry without bound.

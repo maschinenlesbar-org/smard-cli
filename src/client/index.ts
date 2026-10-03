@@ -12,6 +12,8 @@ export {
   assertArgument,
   oneOfProblem,
   intRangeProblem,
+  headerValueProblem,
+  assertHeaderValue,
   nonNegativeIntegerProblem,
   regionProblem,
   resolutionProblem,
