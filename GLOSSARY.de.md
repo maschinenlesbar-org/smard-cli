@@ -56,7 +56,7 @@ Fast jeder Datenabruf wird über drei Koordinaten adressiert – einen **Filter*
 **Filter.** Eine numerische Reihen-ID, die festlegt, *welche* Zeitreihe Sie abrufen
 (z. B. `410` = Gesamtnetzlast, `4068` = Erzeugung Photovoltaik,
 `4169` = Großhandelspreis DE/LU). Die API akzeptiert **jede ganzzahlige** Filter-ID,
-deshalb akzeptieren CLI und Client jede ganze Zahl; der mitgelieferte `FILTERS`-Katalog
+deshalb akzeptieren CLI und Client jede nicht-negative ganze Zahl; der mitgelieferte `FILTERS`-Katalog
 (siehe `smard filters`) dokumentiert die bekannten IDs, ist aber **nicht vollständig**.
 
 **Region.** Ein Code für ein Marktgebiet oder eine Netzregion. Siehe `smard regions`; die

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/client/engine.js";
-import { SmardApiError, SmardNetworkError, SmardParseError } from "../src/client/errors.js";
+import { SmardApiError, SmardError, SmardNetworkError, SmardParseError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 
 // Control characters built via char codes so no raw control bytes ever appear in
@@ -25,6 +25,17 @@ test("buildUrl normalises the path and appends the query", () => {
     e.buildUrl("/x", { a: "1", b: ["2", "3"] }),
     "https://example.test/x?a=1&b=2&b=3",
   );
+});
+
+test("buildUrl refuses a . or .. path segment (defence in depth for direct engine use)", () => {
+  const e = new RequestEngine({ baseUrl: "https://example.test" });
+  for (const path of ["/app/chart_data/410/../index_hour.json", "/app/./x", "/../x"]) {
+    assert.throws(
+      () => e.buildUrl(path),
+      (err: unknown) => err instanceof SmardError && /^Invalid path segment "\.{1,2}" in \//.test(err.message),
+      path,
+    );
+  }
 });
 
 test("a malformed base URL is rejected at construction with a clear, base-only message", () => {

@@ -10,18 +10,23 @@
 //   client.timestamps(410, "DE", "hour")          // available windows
 //   client.series(410, "DE", "hour", ts)          // one window's data
 //   client.latest(410, "DE", "hour")              // newest window's data
+//
+// Every method checks its arguments before any request (a non-negative safe
+// integer filter/timestamp, a region in RegionValues, a resolution in
+// ResolutionValues) and rejects a bad one with a SmardValidationError.
 
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { Region, Resolution } from "./enums.js";
 import type { SeriesResult, TableResult } from "./types.js";
 import { SmardError, SmardParseError } from "./errors.js";
+import { assertId, assertRegion, assertResolution } from "./validate.js";
 
 /**
- * Escape one interpolated path piece. Every argument goes through it — not only
- * `region` — because the client does not validate its arguments (the CLI does), so
- * a JS caller's `resolution` of `"hour/../../admin?x="` or a string `filter` would
- * otherwise steer the request to another path, query or fragment. A `.`/`..` segment,
- * which escaping leaves unchanged, is refused by the engine's `buildUrl`.
+ * Escape one interpolated path piece. Every method validates its arguments first
+ * (`assertId` / `assertRegion` / `assertResolution`, a `SmardValidationError`
+ * before any request), so this is defence in depth: no argument can steer the
+ * request to another path, query or fragment. A `.`/`..` segment, which escaping
+ * leaves unchanged, is also refused by the engine's `buildUrl`.
  */
 const enc = (value: string | number): string => encodeURIComponent(String(value));
 
@@ -39,6 +44,9 @@ export class SmardClient {
 
   /** The timestamps (window starts) available for a (filter, region, resolution). */
   async timestamps(filter: number, region: Region, resolution: Resolution): Promise<number[]> {
+    assertId("filter", filter);
+    assertRegion(region);
+    assertResolution(resolution);
     const path = `/app/chart_data/${enc(filter)}/${enc(region)}/index_${enc(resolution)}.json`;
     const res = await this.engine.getJson<unknown>(path);
     // SMARD answers a (filter, region, resolution) without data with a 404, never
@@ -65,12 +73,16 @@ export class SmardClient {
   }
 
   /** The data file for one window, identified by its timestamp. */
-  series(
+  async series(
     filter: number,
     region: Region,
     resolution: Resolution,
     timestamp: number,
   ): Promise<SeriesResult> {
+    assertId("filter", filter);
+    assertRegion(region);
+    assertResolution(resolution);
+    assertId("timestamp", timestamp);
     return this.engine.getJson(
       `/app/chart_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_${enc(resolution)}_${enc(timestamp)}.json`,
     );
@@ -93,7 +105,10 @@ export class SmardClient {
   }
 
   /** Quarter-hour `table_data` for one window (richer per-point versions). */
-  tableData(filter: number, region: Region, timestamp: number): Promise<TableResult> {
+  async tableData(filter: number, region: Region, timestamp: number): Promise<TableResult> {
+    assertId("filter", filter);
+    assertRegion(region);
+    assertId("timestamp", timestamp);
     return this.engine.getJson(
       `/app/table_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_quarterhour_${enc(timestamp)}.json`,
     );

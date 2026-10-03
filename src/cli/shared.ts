@@ -4,7 +4,7 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "./io.js";
-import { SmardError } from "../client/errors.js";
+import { assertArgument, nonNegativeIntegerProblem } from "../client/validate.js";
 import type { EngineOptions } from "../client/engine.js";
 
 /**
@@ -107,32 +107,16 @@ export function parseBaseUrl(value: string): string {
 }
 
 /**
- * Parse a positional argument as a non-negative integer (commander does not run
- * value-parsers on positional args). Throws a SmardError so run() prints a clear
- * message and exits 1.
+ * Parse a positional argument (a filter id or a timestamp) into a number
+ * (commander does not run value-parsers on positional args). Turning the argv
+ * string into a number is the CLI's job — only plain ASCII digits count, so "",
+ * " 5", "0x10", "1.0" and "1e21" are not numbers here — but the rule the number
+ * must meet is the library's (`nonNegativeIntegerProblem`), and so is the error:
+ * a SmardValidationError echoing the raw value, which run() prints and exits 1 on.
  */
 export function requireInt(value: string, argName: string): number {
-  const n = parseNonNegativeInt(value);
-  if (n === null) {
-    throw new SmardError(`Invalid ${argName} "${value}". Expected a non-negative integer.`);
-  }
-  return n;
-}
-
-/**
- * Validate a positional argument against an allowed set (commander does not
- * support .choices() on positional args). Throws a SmardError so run() prints a
- * clear message and exits 1.
- */
-export function assertEnum<T extends string>(
-  value: string,
-  allowed: readonly T[],
-  argName: string,
-): T {
-  if (!(allowed as readonly string[]).includes(value)) {
-    throw new SmardError(`Invalid ${argName} "${value}". Expected one of: ${allowed.join(", ")}.`);
-  }
-  return value as T;
+  const n = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  return assertArgument<number>(argName, n, nonNegativeIntegerProblem, value);
 }
 
 export interface GlobalOptions {

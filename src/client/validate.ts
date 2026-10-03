@@ -11,6 +11,7 @@
 //   reject rather than throw synchronously; constructors throw.
 
 import { SmardValidationError } from "./errors.js";
+import { RegionValues, ResolutionValues, type Region, type Resolution } from "./enums.js";
 
 /** A validation rule: the reason `value` is invalid, or `undefined` when it is valid. */
 export type Problem<T = unknown> = (value: T) => string | undefined;
@@ -52,4 +53,41 @@ export function assertArgument<T>(
   const reason = problem(value);
   if (reason !== undefined) throw new SmardValidationError(`Invalid ${name} "${shown}". ${reason}`);
   return value as T;
+}
+
+// ---- The chart-data path arguments --------------------------------------------
+
+/**
+ * The rule for a filter id or a window timestamp: a non-negative safe integer.
+ * Anything else — a string, `-1`, `1.5`, `NaN`, `Infinity`, an integer beyond
+ * `Number.MAX_SAFE_INTEGER` (which would be rounded to another file) — would put
+ * a malformed or different path into the request.
+ */
+export const nonNegativeIntegerProblem: Problem<unknown> = (value) =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? undefined
+    : "Expected a non-negative integer.";
+
+/** The rule for a region: one of `RegionValues` (case-sensitive, no padding). */
+export const regionProblem = oneOfProblem(RegionValues);
+
+/** The rule for a resolution: one of `ResolutionValues` (case-sensitive, no padding). */
+export const resolutionProblem = oneOfProblem(ResolutionValues);
+
+/**
+ * Check a filter id or timestamp (`name` says which) and return it; throws
+ * `SmardValidationError` (`Invalid filter "-1". Expected a non-negative integer.`).
+ */
+export function assertId(name: string, value: unknown): number {
+  return assertArgument<number>(name, value, nonNegativeIntegerProblem);
+}
+
+/** Check a region and return it; throws `SmardValidationError` naming the valid regions. */
+export function assertRegion(value: unknown): Region {
+  return assertArgument<Region>("region", value, regionProblem);
+}
+
+/** Check a resolution and return it; throws `SmardValidationError` naming the valid resolutions. */
+export function assertResolution(value: unknown): Resolution {
+  return assertArgument<Resolution>("resolution", value, resolutionProblem);
 }

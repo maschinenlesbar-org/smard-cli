@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SmardClient } from "../src/client/client.js";
-import { SmardApiError, SmardError, SmardNetworkError, SmardParseError } from "../src/client/errors.js";
+import { SmardApiError, SmardError, SmardNetworkError, SmardParseError, SmardValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, constantJson } from "./helpers.js";
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>): SmardClient {
@@ -145,42 +145,23 @@ test("a base URL with a query or fragment is rejected at construction (userinfo 
   }
 });
 
-test("every path argument is escaped, so a library caller cannot steer the request", async () => {
+test("a path-steering argument is rejected before any request, never escaped and sent", async () => {
   const mt = constantJson({ timestamps: [1], meta_data: { version: 1, created: 2 }, series: [] });
-  const c = clientWith(mt);
-  const anyC = c as unknown as {
+  const anyC = clientWith(mt) as unknown as {
     timestamps(f: unknown, r: string, res: string): Promise<unknown>;
     series(f: unknown, r: string, res: string, ts: unknown): Promise<unknown>;
     tableData(f: unknown, r: string, ts: unknown): Promise<unknown>;
   };
-  await anyC.timestamps(410, "DE", "hour/../../../admin?x=");
-  await anyC.series(410, "DE", "hour/../../secret#", 1);
-  await anyC.series("410/../../other", "DE", "hour", 1);
-  await anyC.tableData(410, "DE", "1/../../../x");
-  const urls = mt.calls.map((r) => new URL(r.url));
-  assert.deepEqual(
-    urls.map((u) => u.pathname),
-    [
-      "/app/chart_data/410/DE/index_hour%2F..%2F..%2F..%2Fadmin%3Fx%3D.json",
-      "/app/chart_data/410/DE/410_DE_hour%2F..%2F..%2Fsecret%23_1.json",
-      "/app/chart_data/410%2F..%2F..%2Fother/DE/410%2F..%2F..%2Fother_DE_hour_1.json",
-      "/app/table_data/410/DE/410_DE_quarterhour_1%2F..%2F..%2F..%2Fx.json",
-    ],
-  );
-  assert.ok(urls.every((u) => u.search === "" && u.hash === ""));
-});
-
-test("a . or .. path segment is refused before any request", async () => {
-  const mt = constantJson({ timestamps: [1] });
-  const anyC = clientWith(mt) as unknown as {
-    timestamps(f: unknown, r: string, res: string): Promise<unknown>;
-  };
-  for (const [f, r] of [[410, ".."], ["..", "DE"], [410, "."]] as const) {
-    await assert.rejects(
-      () => anyC.timestamps(f, r, "hour"),
-      (err: unknown) =>
-        err instanceof SmardError && /^Invalid path segment "\.{1,2}" in \/app\/chart_data\//.test(err.message),
-    );
+  for (const call of [
+    () => anyC.timestamps(410, "DE", "hour/../../../admin?x="),
+    () => anyC.series(410, "DE", "hour/../../secret#", 1),
+    () => anyC.series("410/../../other", "DE", "hour", 1),
+    () => anyC.tableData(410, "DE", "1/../../../x"),
+    () => anyC.timestamps(410, "..", "hour"),
+    () => anyC.timestamps("..", "DE", "hour"),
+    () => anyC.timestamps(410, ".", "hour"),
+  ]) {
+    await assert.rejects(call, SmardValidationError);
   }
   assert.equal(mt.calls.length, 0);
 });

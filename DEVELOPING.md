@@ -74,16 +74,18 @@ exported for reference; `filtersByGroup(group?)` returns the catalogue or one gr
 `smard filters --group` prints) and throws `SmardValidationError` for an unknown group instead of
 returning an empty list.
 
-> **Note for library callers:** `SmardClient` performs **no** validation of its
-> `filter` / `region` / `resolution` / `timestamp` arguments — all input
-> validation (non-negative integers, enum membership) lives in the CLI layer.
-> The `Region` / `Resolution` types are compile-time hints only; an arbitrary
-> string cast to `Region` or `Resolution` is merely `encodeURIComponent`-escaped,
-> not checked against `RegionValues` / `ResolutionValues`. Every argument —
-> `filter` and `timestamp` too, should a JS caller pass a string — is escaped the
-> same way, so none can add a path segment, query or fragment, and a `.` / `..`
-> segment is refused (`SmardError`, no request). Validate untrusted input yourself
-> before calling.
+> **Input checks.** Every `SmardClient` method checks its arguments before any
+> request: `filter` and `timestamp` must be non-negative safe integers (so `-1`,
+> `1.5`, `NaN`, `Infinity`, a string or an integer beyond `Number.MAX_SAFE_INTEGER`,
+> which would be rounded to another file, are refused), `region` must be one of
+> `RegionValues` and `resolution` one of `ResolutionValues` (exact case, no padding).
+> A bad argument rejects with `SmardValidationError` — the same message the CLI
+> prints, e.g. `Invalid region "de". Expected one of: DE, AT, …` — and sends no
+> request, so a typo is never mistaken for SMARD's "no data" 404. The rules are
+> exported (`nonNegativeIntegerProblem`, `regionProblem`, `resolutionProblem`,
+> `assertId`, `assertRegion`, `assertResolution`) and the CLI calls the same ones.
+> Every argument is still `encodeURIComponent`-escaped and the engine's `buildUrl`
+> refuses a `.` / `..` segment, as defence in depth.
 >
 > Likewise, the **response** types (`SeriesResult` / `TableResult`) are a typed
 > **pass-through**: any successful (2xx) JSON body is parsed and returned cast to
@@ -123,8 +125,8 @@ src/
   uses `node:http`/`node:https`; tests inject a mock. This keeps the client free of any HTTP framework.
 - The CLI is built around injectable `CliDeps` (client factory + I/O), so the whole program can be
   driven in-process by tests with a mocked client and captured output — no subprocesses.
-- The API accepts any integer filter id, so the CLI accepts any integer and uses the `FILTERS`
-  catalogue only for the `filters` listing and documentation.
+- The API accepts any integer filter id, so the client and the CLI accept any non-negative integer
+  and use the `FILTERS` catalogue only for the `filters` listing and documentation.
 - **Network policy.** Redirects are **never followed** (a deliberate blueprint
   divergence): any `3xx` falls into the non-2xx branch and surfaces as a
   `SmardApiError`, so there is no cross-origin hop on which anything could leak
@@ -198,12 +200,14 @@ listing commands and as `Region`/`Resolution`/`FilterGroup` union types.
 `FilterGroupValues` (`SmardValidationError`); the `filters` command calls it. `FILTERS` is not
 exhaustive: the API accepts any integer filter id.
 
-**Validation boundary.** All input validation (non-negative integers, enum
-membership) lives in the **CLI** layer. `SmardClient` performs **no** validation;
-a `Region`/`Resolution` is a compile-time hint only, merely
-`encodeURIComponent`-escaped, not checked against the value arrays. Every path
-argument (`filter`, `region`, `resolution`, `timestamp`) is escaped, and the
-engine's `buildUrl` refuses a `.`/`..` segment.
+**Validation boundary.** The library owns the input rules
+([`validate.ts`](src/client/validate.ts)): `SmardClient` rejects a filter or
+timestamp that is not a non-negative safe integer, a region outside
+`RegionValues` and a resolution outside `ResolutionValues` with a
+`SmardValidationError` before any request. The CLI only turns the argv strings
+into values (plain ASCII digits for a number) and calls the same rules, so the
+CLI and the library reject the same inputs with the same message. Every path
+argument is also escaped, and the engine's `buildUrl` refuses a `.`/`..` segment.
 
 **Typed pass-through.** Response types (`SeriesResult`, `TableResult`) are a
 convenience typing over the documented shape, not a runtime guarantee. The one

@@ -57,7 +57,7 @@ Almost every data call is addressed by three coordinates — a **filter**, a
 **filter.** A numeric series id identifying *what* time series you want
 (e.g. `410` = total grid load, `4068` = photovoltaic generation,
 `4169` = DE/LU wholesale price). The API accepts **any integer** filter id, so
-the CLI and client accept any integer; the bundled `FILTERS` catalogue (see
+the CLI and client accept any non-negative integer; the bundled `FILTERS` catalogue (see
 `smard filters`) documents the well-known ones but is **not exhaustive**.
 
 **region.** A market or grid area code. See `smard regions`; the valid set
