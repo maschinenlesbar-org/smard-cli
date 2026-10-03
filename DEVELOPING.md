@@ -137,8 +137,8 @@ src/
   `SmardNetworkError`, so a library caller's custom `Transport` never receives one;
   and the default transport (`http.ts`) checks every request URL. A base URL with a
   query (`?`) or fragment (`#`) is refused in the parser and the engine (the API
-  path is appended to it as a string), and so is surrounding whitespace in the
-  parser. Userinfo (`https://user:pw@mirror`) is kept and sent as Basic auth, but
+  path is appended to it as a string), and so are a blank value and surrounding
+  whitespace (`baseUrlProblem`, checked on the value as passed). Userinfo (`https://user:pw@mirror`) is kept and sent as Basic auth, but
   `redactUrl` shows it as `***` in every error message and in `SmardApiError.url`.
 
 ### Library / technical terms
@@ -187,6 +187,12 @@ no CR/LF — no DEL, nothing above U+00FF); the constructor rejects anything els
 with `SmardValidationError`, whatever the transport, and the CLI's `--user-agent`
 parser applies the same rule. Should Node's HTTP layer still refuse a header, the
 default transport rejects with a `SmardNetworkError`, never a raw `TypeError`.
+
+**Blank options.** Only `undefined` selects a default (`DEFAULT_BASE_URL`, the
+`smard-cli` User-Agent). An explicit blank `baseUrl` or `userAgent`, or a
+`baseUrl` with surrounding whitespace, throws `SmardValidationError` — the same
+values the CLI's `--base-url` / `--user-agent` reject — instead of silently meaning
+production, the default User-Agent or a different path on a mirror.
 
 **Error types.** [`errors.ts`](src/client/errors.ts): `SmardApiError` (non-2xx,
 carries `status`/`detail`/`url`/`body`), `SmardNetworkError` (transport

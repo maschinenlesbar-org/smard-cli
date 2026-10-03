@@ -5,7 +5,7 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "./io.js";
 import { assertArgument, headerValueProblem, nonNegativeIntegerProblem } from "../client/validate.js";
-import type { EngineOptions } from "../client/engine.js";
+import { baseUrlProblem, type EngineOptions } from "../client/engine.js";
 
 /**
  * Parse a plain non-negative decimal integer string. Validates the *raw string*
@@ -87,11 +87,10 @@ export function parseBaseUrl(value: string): string {
   if (/[?#]/.test(value)) {
     throw new InvalidArgumentError("A base URL cannot have a query (?) or fragment (#).");
   }
-  // new URL() trims surrounding whitespace silently; the raw value is what the
-  // engine uses, so reject it rather than guess.
-  if (value !== value.trim()) {
-    throw new InvalidArgumentError("A base URL cannot have surrounding whitespace.");
-  }
+  // The library's rule: no blank value, no surrounding whitespace (new URL()
+  // trims silently, but the engine uses the raw value).
+  const reason = baseUrlProblem(value);
+  if (reason !== undefined) throw new InvalidArgumentError(reason);
   return value;
 }
 

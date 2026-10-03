@@ -17,11 +17,14 @@ export interface RawResponse {
 }
 
 export interface EngineOptions {
-  /** Base URL of the API. Defaults to https://www.smard.de */
+  /**
+   * Base URL of the API. Defaults to https://www.smard.de when left `undefined`;
+   * a blank or whitespace-padded value is rejected.
+   */
   baseUrl?: string;
   /** Swappable transport. Defaults to the built-in node http/https transport. */
   transport?: Transport;
-  /** Value of the User-Agent header. */
+  /** Value of the User-Agent header; `undefined` means "smard-cli", a blank value is rejected. */
   userAgent?: string;
   /**
    * Time limit per request in milliseconds, covering the whole response body, not
@@ -144,6 +147,19 @@ function assertHttpScheme(baseUrl: string): void {
   }
 }
 
+/**
+ * The rule for a configured base URL, checked on the value as passed (before the
+ * trailing-slash strip): not blank, and no surrounding whitespace. `new URL()`
+ * trims silently, but the engine appends request paths to the raw string, so a
+ * trailing space would request `/%20/app/...` on the mirror and a leading one
+ * would fail late with an opaque "Invalid URL".
+ */
+export function baseUrlProblem(value: unknown): string | undefined {
+  if (typeof value !== "string" || value.trim() === "") return "Expected an absolute http(s) URL.";
+  if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
+  return undefined;
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -158,19 +174,22 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
-    // Treat an empty/blank base URL as "use the default" rather than building
-    // relative URLs that later fail with an opaque "Invalid URL".
-    const baseUrl = options.baseUrl?.trim() ? options.baseUrl : DEFAULT_BASE_URL;
+    // Only `undefined` selects the default. An explicit blank or padded value is
+    // rejected (SmardValidationError), as the CLI rejects it, rather than silently
+    // meaning production or a different path on the mirror.
+    const baseUrl = options.baseUrl === undefined
+      ? DEFAULT_BASE_URL
+      : assertValid("baseUrl", options.baseUrl, baseUrlProblem);
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     assertHttpScheme(this.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
-    // Treat an empty/blank User-Agent as "use the default": some endpoints serve
-    // an HTML challenge page (not JSON) when no User-Agent is sent. Any other value
-    // must be a valid header value (no CR/LF or other controls, nothing above
-    // U+00FF), whatever the transport.
-    this.userAgent = options.userAgent?.trim()
-      ? assertHeaderValue("userAgent", options.userAgent)
-      : DEFAULT_USER_AGENT;
+    // Only `undefined` selects the default User-Agent (some endpoints serve an HTML
+    // challenge page, not JSON, without one). Any value passed must be a valid,
+    // non-blank header value (no CR/LF or other controls, nothing above U+00FF),
+    // whatever the transport.
+    this.userAgent = options.userAgent === undefined
+      ? DEFAULT_USER_AGENT
+      : assertHeaderValue("userAgent", options.userAgent);
     // The numeric options are range-checked here, not only by the CLI's parsers: a
     // negative, NaN or fractional value would otherwise silently switch off the
     // timeout or the size cap downstream, and Infinity would retry without bound.
