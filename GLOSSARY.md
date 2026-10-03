@@ -77,7 +77,8 @@ data file covers a fixed window (e.g. one week of hourly values).
 ## Filter groups
 
 The `FILTERS` catalogue tags each documented filter with one of four groups
-(`smard filters --group <group>`):
+(`FilterGroupValues`; `smard filters --group <group>`, or `filtersByGroup(group)` in
+the library — an unknown group is an error there too, not an empty list):
 
 **generation (Stromerzeugung).** Realised electricity generation by source, e.g.
 Braunkohle/lignite (`1223`), Kernenergie/nuclear (`1224`), Wind Offshore

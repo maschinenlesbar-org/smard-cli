@@ -25,6 +25,10 @@ export const RegionValues = [
 ] as const;
 export type Region = (typeof RegionValues)[number];
 
+/** The groups the `FILTERS` catalogue is tagged with (see `filtersByGroup`). */
+export const FilterGroupValues = ["generation", "consumption", "price", "forecast"] as const;
+export type FilterGroup = (typeof FilterGroupValues)[number];
+
 /**
  * The documented chart-data filters (the time series you can request), grouped
  * for readability. The numeric id is what the API path takes; the label is for
@@ -34,7 +38,7 @@ export type Region = (typeof RegionValues)[number];
 export interface FilterInfo {
   id: number;
   label: string;
-  group: "generation" | "consumption" | "price" | "forecast";
+  group: FilterGroup;
 }
 
 export const FILTERS: FilterInfo[] = [

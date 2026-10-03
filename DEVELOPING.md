@@ -69,7 +69,10 @@ new SmardClient({
 
 `client.timestamps(filter, region, resolution)`, `client.series(filter, region, resolution, timestamp)`,
 `client.latest(filter, region, resolution)`, `client.tableData(filter, region, timestamp)`.
-The `FILTERS` array and the `RegionValues` / `ResolutionValues` enums are exported for reference.
+The `FILTERS` array and the `RegionValues` / `ResolutionValues` / `FilterGroupValues` enums are
+exported for reference; `filtersByGroup(group?)` returns the catalogue or one group of it (what
+`smard filters --group` prints) and throws `SmardValidationError` for an unknown group instead of
+returning an empty list.
 
 > **Note for library callers:** `SmardClient` performs **no** validation of its
 > `filter` / `region` / `resolution` / `timestamp` arguments — all input
@@ -188,9 +191,11 @@ the reason into a usage error rather than keeping a copy. Tests check this with
 the `parity()` helper in `test/helpers.ts`, which sends one input through `run()`
 and through the library on one recording mock transport.
 
-**FILTERS / RegionValues / ResolutionValues.** The exported catalogue and const
-value arrays — used for the `filters`/`regions`/`resolutions` listing commands
-and as compile-time `Region`/`Resolution` union types. `FILTERS` is not
+**FILTERS / RegionValues / ResolutionValues / FilterGroupValues.** The exported
+catalogue and const value arrays — used for the `filters`/`regions`/`resolutions`
+listing commands and as `Region`/`Resolution`/`FilterGroup` union types.
+`filtersByGroup(group?)` selects one group of `FILTERS` and rejects a group not in
+`FilterGroupValues` (`SmardValidationError`); the `filters` command calls it. `FILTERS` is not
 exhaustive: the API accepts any integer filter id.
 
 **Validation boundary.** All input validation (non-negative integers, enum

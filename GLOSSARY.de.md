@@ -76,7 +76,8 @@ Datenfensters markiert. Gültige Werte liefert `smard timestamps`; einen davon �
 ## Filtergruppen
 
 Der `FILTERS`-Katalog ordnet jeden dokumentierten Filter einer von vier Gruppen zu
-(`smard filters --group <group>`):
+(`FilterGroupValues`; `smard filters --group <group>` oder in der Bibliothek
+`filtersByGroup(group)` – eine unbekannte Gruppe ist auch dort ein Fehler, keine leere Liste):
 
 **generation (Stromerzeugung).** Tatsächliche Stromerzeugung nach Energieträger, z. B.
 Braunkohle (`1223`), Kernenergie (`1224`), Wind Offshore

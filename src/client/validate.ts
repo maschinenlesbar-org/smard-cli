@@ -25,3 +25,31 @@ export function assertValid<T>(name: string, value: T, problem: Problem<T>): T {
   if (reason !== undefined) throw new SmardValidationError(`Invalid ${name}: ${reason}`);
   return value;
 }
+
+/**
+ * A rule that accepts only one of `allowed` (compared with `includes`, never a
+ * keyed lookup, so inherited names such as "constructor" are not members).
+ */
+export function oneOfProblem(allowed: readonly string[]): Problem<unknown> {
+  return (value) =>
+    typeof value === "string" && allowed.includes(value)
+      ? undefined
+      : `Expected one of: ${allowed.join(", ")}.`;
+}
+
+/**
+ * Like {@link assertValid}, but with the message the CLI has always printed for
+ * a rejected argument value, which echoes the value:
+ * `Invalid <name> "<value>". <reason>`. `shown` is what to echo (the raw argv
+ * string where the CLI parsed it into another type); it defaults to the value.
+ */
+export function assertArgument<T>(
+  name: string,
+  value: unknown,
+  problem: Problem<unknown>,
+  shown: string = String(value),
+): T {
+  const reason = problem(value);
+  if (reason !== undefined) throw new SmardValidationError(`Invalid ${name} "${shown}". ${reason}`);
+  return value as T;
+}
