@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SmardClient } from "../src/client/client.js";
-import { SmardApiError, SmardError, SmardNetworkError, SmardParseError, SmardValidationError } from "../src/client/errors.js";
+import { SmardApiError, SmardError, SmardParseError, SmardValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, constantJson } from "./helpers.js";
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>): SmardClient {
@@ -127,7 +127,7 @@ test("a file: base URL is rejected when the client is constructed, before any re
   const mt = constantJson({ timestamps: [] });
   assert.throws(
     () => new SmardClient({ baseUrl: "file:///etc/passwd", transport: mt.transport }),
-    (err: unknown) => err instanceof SmardNetworkError && /Unsupported protocol "file:"/.test(err.message),
+    (err: unknown) => err instanceof SmardValidationError && /Unsupported scheme "file:"/.test(err.message),
   );
   assert.equal(mt.calls.length, 0);
 });
@@ -137,8 +137,8 @@ test("a base URL with a query or fragment is rejected at construction (userinfo 
     assert.throws(
       () => new SmardClient({ baseUrl: base, transport: constantJson({}).transport }),
       (err: unknown) =>
-        err instanceof SmardNetworkError &&
-        /^Base URL must not contain a query or fragment: /.test(err.message) &&
+        err instanceof SmardValidationError &&
+        err.message === "Invalid baseUrl: A base URL cannot have a query (?) or fragment (#)." &&
         !err.message.includes("secret"),
       base,
     );

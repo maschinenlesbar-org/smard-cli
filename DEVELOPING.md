@@ -130,16 +130,18 @@ src/
 - **Network policy.** Redirects are **never followed** (a deliberate blueprint
   divergence): any `3xx` falls into the non-2xx branch and surfaces as a
   `SmardApiError`, so there is no cross-origin hop on which anything could leak
-  (and, being keyless, nothing to leak). The `http:`/`https:` **scheme allowlist**
-  is enforced in three places, as in the sibling CLIs: the `--base-url` option
-  parser (`parseBaseUrl`) makes a `file:`/`ftp:`/malformed value a usage error at
-  parse time; the `RequestEngine` constructor rejects a non-http(s) base URL with a
-  `SmardNetworkError`, so a library caller's custom `Transport` never receives one;
-  and the default transport (`http.ts`) checks every request URL. A base URL with a
-  query (`?`) or fragment (`#`) is refused in the parser and the engine (the API
-  path is appended to it as a string), and so are a blank value and surrounding
-  whitespace (`baseUrlProblem`, checked on the value as passed). Userinfo (`https://user:pw@mirror`) is kept and sent as Basic auth, but
-  `redactUrl` shows it as `***` in every error message and in `SmardApiError.url`.
+  (and, being keyless, nothing to leak). The base-URL rules live in one place,
+  the library's `baseUrlProblem` / `validateBaseUrl` (`engine.ts`), checked on the
+  value as passed: an absolute URL, an `http:`/`https:` scheme, no query (`?`) or
+  fragment (`#`) (the API path is appended to it as a string), and no surrounding
+  whitespace. The `RequestEngine` constructor throws a `SmardValidationError` for
+  a bad base URL — a configuration error, not a `SmardNetworkError` — so a library
+  caller's custom `Transport` never receives one, and the `--base-url` option
+  parser (`parseBaseUrl`) calls the same rule to make it a usage error at parse
+  time. The default transport (`http.ts`) still checks the scheme of every request
+  URL (`SmardNetworkError`). Userinfo (`https://user:pw@mirror`) is kept and sent
+  as Basic auth, but `redactUrl` shows it as `***` in every error message and in
+  `SmardApiError.url`, and no base-URL rejection echoes the value.
 
 ### Library / technical terms
 

@@ -65,30 +65,12 @@ export function parseHeaderValue(value: string): string {
 }
 
 /**
- * commander value-parser for `--base-url`: an absolute http(s) URL. A `file:`,
- * `ftp:` or malformed value is a usage error at parse time, before any client is
- * built. The engine and the default transport reject a non-http(s) scheme too,
- * but this surfaces the mistake up front and independently of the transport.
+ * commander value-parser for `--base-url`. The rules (absolute http(s) URL, no
+ * query or fragment, no surrounding whitespace) are the library's
+ * `baseUrlProblem`, which the engine enforces too; its reason becomes a usage
+ * error here, at parse time, before any client is built.
  */
 export function parseBaseUrl(value: string): string {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    throw new InvalidArgumentError("Expected an absolute http(s) URL.");
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new InvalidArgumentError(
-      `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`,
-    );
-  }
-  // Paths are appended to the base URL as a string, so a query or fragment would
-  // swallow every request path ("http://h/#f" requests "/" for every command).
-  if (/[?#]/.test(value)) {
-    throw new InvalidArgumentError("A base URL cannot have a query (?) or fragment (#).");
-  }
-  // The library's rule: no blank value, no surrounding whitespace (new URL()
-  // trims silently, but the engine uses the raw value).
   const reason = baseUrlProblem(value);
   if (reason !== undefined) throw new InvalidArgumentError(reason);
   return value;

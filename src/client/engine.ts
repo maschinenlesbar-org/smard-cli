@@ -4,7 +4,7 @@
 
 import { MAX_TIMEOUT_MS, nodeHttpTransport, type Transport } from "./http.js";
 import { buildQueryString, type QueryParams } from "./query.js";
-import { SmardApiError, SmardError, SmardNetworkError, SmardParseError, redactUrl } from "./errors.js";
+import { SmardApiError, SmardError, SmardParseError } from "./errors.js";
 import { assertHeaderValue, assertValid, intRangeProblem, nonNegativeIntegerProblem } from "./validate.js";
 
 export const DEFAULT_BASE_URL = "https://www.smard.de";
@@ -119,45 +119,47 @@ function sanitizeServerText(text: string): string {
 }
 
 /**
- * Reject a base URL whose scheme is not http(s), or that has a query or fragment
- * (request paths are appended to it as a string, so a `?` or `#` would swallow every
- * path: `http://h/?x=1` requests `/?x=1/app/...` and `http://h/#f` requests `/`).
- * The default transport already
- * gates this per hop, but the engine is exported as a library and may be handed a
- * custom transport that does no such check, so gate the configured base URL here
- * too (a `file:`/`ftp:` base URL fails fast with a typed error). A malformed base
- * URL (e.g. a stray `notaurl`) gets a clear message naming only the offending
- * value, instead of an opaque "Invalid URL" carrying a request path that reads as
- * if the path were at fault.
+ * The rule for a configured base URL — every rule, so the CLI's `--base-url`
+ * parser keeps none of its own. Checked on the value as passed, before the
+ * trailing-slash strip, in this order:
+ *
+ * - it parses as an absolute URL (so a blank value or a stray `notaurl` is
+ *   refused with a message about the base URL, not an opaque "Invalid URL" that
+ *   names a request path);
+ * - its scheme is `http:` or `https:` (the default transport gates this per hop,
+ *   but a custom transport may not, so a `file:`/`ftp:` base URL never reaches one);
+ * - it has no query or fragment (request paths are appended to it as a string, so
+ *   `http://h/?x=1` would request `/?x=1/app/...` and `http://h/#f` would request `/`);
+ * - it has no surrounding whitespace (`new URL()` trims silently, but the engine
+ *   appends request paths to the raw string, so a trailing space would request
+ *   `/%20/app/...` on the mirror).
+ *
+ * Userinfo (`https://user:pw@mirror`) is allowed and sent as Basic auth. No reason
+ * echoes the value, so a credential in it never reaches an error message.
  */
-function assertHttpScheme(baseUrl: string): void {
+export function baseUrlProblem(value: unknown): string | undefined {
+  if (typeof value !== "string") return "Expected an absolute http(s) URL.";
   let url: URL;
   try {
-    url = new URL(baseUrl);
+    url = new URL(value);
   } catch {
-    throw new SmardNetworkError(`Invalid base URL: ${JSON.stringify(baseUrl)}`);
+    return "Expected an absolute http(s) URL.";
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new SmardNetworkError(
-      `Unsupported protocol "${url.protocol}" in base URL: ${redactUrl(baseUrl)}`,
-    );
+    return `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`;
   }
-  if (/[?#]/.test(baseUrl)) {
-    throw new SmardNetworkError(`Base URL must not contain a query or fragment: ${redactUrl(baseUrl)}`);
-  }
+  if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
+  if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
+  return undefined;
 }
 
 /**
- * The rule for a configured base URL, checked on the value as passed (before the
- * trailing-slash strip): not blank, and no surrounding whitespace. `new URL()`
- * trims silently, but the engine appends request paths to the raw string, so a
- * trailing space would request `/%20/app/...` on the mirror and a leading one
- * would fail late with an opaque "Invalid URL".
+ * Check a base URL against {@link baseUrlProblem} and return it without trailing
+ * slashes; throws `SmardValidationError` (`Invalid baseUrl: <reason>`). This is a
+ * configuration error, not a transport failure, so it is never a SmardNetworkError.
  */
-export function baseUrlProblem(value: unknown): string | undefined {
-  if (typeof value !== "string" || value.trim() === "") return "Expected an absolute http(s) URL.";
-  if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
-  return undefined;
+export function validateBaseUrl(raw: string): string {
+  return assertValid("baseUrl", raw, baseUrlProblem).replace(/\/+$/, "");
 }
 
 const realSleep = (ms: number): Promise<void> =>
@@ -177,11 +179,9 @@ export class RequestEngine {
     // Only `undefined` selects the default. An explicit blank or padded value is
     // rejected (SmardValidationError), as the CLI rejects it, rather than silently
     // meaning production or a different path on the mirror.
-    const baseUrl = options.baseUrl === undefined
+    this.baseUrl = options.baseUrl === undefined
       ? DEFAULT_BASE_URL
-      : assertValid("baseUrl", options.baseUrl, baseUrlProblem);
-    this.baseUrl = baseUrl.replace(/\/+$/, "");
-    assertHttpScheme(this.baseUrl);
+      : validateBaseUrl(options.baseUrl);
     this.transport = options.transport ?? nodeHttpTransport;
     // Only `undefined` selects the default User-Agent (some endpoints serve an HTML
     // challenge page, not JSON, without one). Any value passed must be a valid,
@@ -219,7 +219,7 @@ export class RequestEngine {
    * turns their "%" into "%25".)
    */
   buildUrl(path: string, query?: QueryParams): string {
-    // The base URL was validated (absolute, http(s)) in the constructor.
+    // The base URL was validated (validateBaseUrl) in the constructor.
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const dotSegment = normalizedPath.split("/").find((s) => s === "." || s === "..");
     if (dotSegment !== undefined) {

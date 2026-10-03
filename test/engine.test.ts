@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/client/engine.js";
-import { SmardApiError, SmardError, SmardNetworkError, SmardParseError } from "../src/client/errors.js";
+import { SmardApiError, SmardError, SmardParseError, SmardValidationError } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 
 // Control characters built via char codes so no raw control bytes ever appear in
@@ -43,8 +43,8 @@ test("a malformed base URL is rejected at construction with a clear, base-only m
   assert.throws(
     () => new RequestEngine({ baseUrl: "notaurl", transport: mt.transport }),
     (err: unknown) =>
-      err instanceof SmardNetworkError &&
-      /Invalid base URL: "notaurl"/.test(err.message) &&
+      err instanceof SmardValidationError &&
+      err.message === "Invalid baseUrl: Expected an absolute http(s) URL." &&
       // the diagnostic must NOT carry a request path (which read as if it were at fault)
       !/chart_data/.test(err.message),
   );
@@ -57,7 +57,7 @@ test("a non-http(s) base URL is rejected at construction, even with a custom tra
     assert.throws(
       () => new RequestEngine({ baseUrl: bad, transport: mt.transport }),
       (err: unknown) =>
-        err instanceof SmardNetworkError && /Unsupported protocol/.test(err.message),
+        err instanceof SmardValidationError && /Unsupported scheme/.test(err.message),
       bad,
     );
     assert.equal(mt.calls.length, 0, `${bad} must not reach the transport`);
