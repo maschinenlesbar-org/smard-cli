@@ -5,7 +5,7 @@
 import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
 import type { CliDeps } from "./io.js";
-import { SmardApiError, SmardError } from "../client/errors.js";
+import { SmardApiError, SmardError, SmardValidationError } from "../client/errors.js";
 
 /**
  * Apply exitOverride + output redirection to every command in the tree.
@@ -58,6 +58,12 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
     if (err instanceof CommanderError) {
       // Help/version requests exit 0; genuine parse errors carry their own code.
       return err.exitCode;
+    }
+    if (err instanceof SmardValidationError) {
+      // The library rejected an input before any request: a usage error, which
+      // exits 1 like a value commander's parsers reject.
+      deps.io.err(`Error: ${err.message}`);
+      return 1;
     }
     if (err instanceof SmardApiError) {
       deps.io.err(`Error: ${err.message}`);

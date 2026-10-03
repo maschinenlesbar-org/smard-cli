@@ -102,7 +102,8 @@ src/
     query.ts     # dependency-free query-string builder
     http.ts      # the Transport interface + default node:http/https transport
     engine.ts    # URL building, retry/backoff, JSON/raw decoding, error mapping
-    errors.ts    # SmardError / SmardApiError / SmardNetworkError / SmardParseError
+    errors.ts    # SmardError / SmardApiError / SmardNetworkError / SmardParseError / SmardValidationError
+    validate.ts  # input rules (Problem functions) + assertValid, shared with the CLI
     client.ts    # SmardClient — the chart-data surface over the engine
   cli/
     io.ts        # injectable I/O seam (stdout/stderr/file)
@@ -171,8 +172,21 @@ body size, defending against memory exhaustion; a breach aborts the request with
 **Error types.** [`errors.ts`](src/client/errors.ts): `SmardApiError` (non-2xx,
 carries `status`/`detail`/`url`/`body`), `SmardNetworkError` (transport
 failure/timeout), `SmardResponseTooLargeError` (size-cap breach, a subclass of
-`SmardNetworkError`) and `SmardParseError` (bad JSON), all extending
-`SmardError`. The CLI maps a `404` to exit code `4`, every other error to `1`.
+`SmardNetworkError`), `SmardParseError` (bad JSON) and `SmardValidationError` (an
+input the library rejects before any request), all extending `SmardError`. The
+CLI maps a `404` to exit code `4`, every other error to `1` — a
+`SmardValidationError` included, which is the CLI's usage exit code.
+
+**Input validation.** A rule about what a request may contain belongs in the
+library, in [`validate.ts`](src/client/validate.ts) or next to the option it
+guards, as an exported `…Problem(value)` function that returns the reason a value
+is invalid (or `undefined`). The library enforces it with `assertValid(name,
+value, problem)`, which throws `SmardValidationError` with the message
+`Invalid <name>: <reason>` before any request (methods that return a promise
+reject; constructors throw). The CLI's parsers call the same functions and turn
+the reason into a usage error rather than keeping a copy. Tests check this with
+the `parity()` helper in `test/helpers.ts`, which sends one input through `run()`
+and through the library on one recording mock transport.
 
 **FILTERS / RegionValues / ResolutionValues.** The exported catalogue and const
 value arrays — used for the `filters`/`regions`/`resolutions` listing commands
@@ -208,6 +222,7 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`engine.test.ts`** — URL building, JSON decoding, error mapping, 429/503 retry — mocked transport.
 - **`client.test.ts`** — every method's URL mapping, including the `latest` index→data flow — mocked transport.
 - **`cli.test.ts`** — end-to-end command parsing, validation and exit codes — mocked client.
+- **`validate.test.ts`** — `assertValid`, the `SmardValidationError` exit-code mapping and the `parity()` helper.
 
 ## Continuous integration
 
