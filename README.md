@@ -26,7 +26,7 @@ residual load and wholesale prices as clean JSON you can pipe straight into
 npm i -g @maschinenlesbar.org/smard-cli
 ```
 
-This installs the **`smard`** command. Requires **Node.js 20+**.
+This installs the **`smard`** command. Requires **Node.js 22.12+**.
 
 Check it works:
 
@@ -163,7 +163,7 @@ its stderr reader has gone away (`2>&1 | true`).
 ## Troubleshooting
 
 - **`command not found: smard`** — the global npm bin directory isn't on your
-  `PATH`. Run `npm bin -g` to find it and add it, or run via
+  `PATH`. Run `echo "$(npm prefix -g)/bin"` to find it and add it, or run via
   `npx @maschinenlesbar.org/smard-cli …`.
 - **Exit `4` / "not found"** — the timestamp is not a window start, or the
   filter/region/resolution combination has no data (SMARD answers both with a
