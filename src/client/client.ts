@@ -127,10 +127,13 @@ export class SmardClient {
     // later request interpolates a chosen element into the path of a follow-up
     // GET (`series()` in `latest()`). `series()` escapes it, but a string element
     // such as `"x#"` or `"1/../evil"` from a hostile/MITM'd origin is never a
-    // window start; requiring safe integers rejects it at the trust boundary.
-    if (!ts.every((t) => typeof t === "number" && Number.isSafeInteger(t))) {
+    // window start; requiring non-negative safe integers (epoch milliseconds)
+    // rejects it at the trust boundary. A negative element is refused here too:
+    // `latest()` would otherwise pass it to `series()`, whose argument check then
+    // blamed the user ("Invalid timestamp "-5"") for a value the server sent.
+    if (!ts.every(isEpochMs)) {
       throw new SmardParseError(
-        `Malformed index from ${path}: "timestamps" contains a non-integer element.`,
+        `Malformed index from ${path}: "timestamps" contains an element that is not a non-negative integer.`,
       );
     }
     return ts;

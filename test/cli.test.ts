@@ -353,3 +353,18 @@ test("a malformed table_data file exits 1 with a parse error", async () => {
   assert.equal(await run(["--compact", "table", "410", "DE", "1698012000000"], cli.deps), 0);
   assert.deepEqual(JSON.parse(cli.out.join("\n")), live);
 });
+
+test("a negative timestamp in the index is the server's malformed index, never the user's input (04#2)", async () => {
+  for (const argv of [
+    ["timestamps", "817", "DE", "hour"],
+    ["latest", "817", "DE", "hour"],
+  ]) {
+    const cli = makeCli(() => jsonResponse({ timestamps: [-5] }));
+    const code = await run(argv, cli.deps);
+    assert.equal(code, 1, argv[0]);
+    assert.deepEqual(cli.out, []);
+    assert.match(cli.err.join("\n"), /^Error: Malformed index from \/app\/chart_data\/817\/DE\/index_hour\.json: "timestamps" contains an element that is not a non-negative integer\.$/);
+    assert.doesNotMatch(cli.err.join("\n"), /Invalid timestamp/);
+    assert.equal(cli.mt.calls.length, 1, "no data file is requested");
+  }
+});
