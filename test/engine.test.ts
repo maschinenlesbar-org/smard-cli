@@ -76,6 +76,23 @@ test("getJson throws SmardParseError on invalid JSON", async () => {
   await assert.rejects(() => e.getJson("/x"), SmardParseError);
 });
 
+test("getJson decodes a body by its declared charset, drops a BOM, rejects an unknown label", async () => {
+  const text = "Großhandel µ";
+  const latin1 = makeMockTransport(() =>
+    rawResponse(Buffer.from(JSON.stringify({ name: text }), "latin1"), "application/json; charset=ISO-8859-1"),
+  );
+  assert.deepEqual(await new RequestEngine({ transport: latin1.transport }).getJson("/x"), { name: text });
+  const bom = makeMockTransport(() =>
+    rawResponse(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('{"a":1}')]), "application/json"),
+  );
+  assert.deepEqual(await new RequestEngine({ transport: bom.transport }).getJson("/x"), { a: 1 });
+  const unknown = makeMockTransport(() => rawResponse('{"a":1}', "application/json; charset=x-nonsense"));
+  await assert.rejects(
+    () => new RequestEngine({ transport: unknown.transport }).getJson("/x"),
+    (e: unknown) => e instanceof SmardParseError && /Unsupported response charset "x-nonsense"/.test(e.message),
+  );
+});
+
 test("a 503 is retried up to maxRetries then surfaces as SmardApiError", async () => {
   let calls = 0;
   const mt = makeMockTransport(() => {

@@ -169,7 +169,10 @@ serialises queries, applies retry/backoff, decodes JSON/raw responses and maps
 errors. Sits between the client and the transport.
 
 **RawResponse.** The engine's raw result: `{ data: Buffer, contentType, status }`
-— raw bytes, never lossily decoded.
+— raw bytes, never lossily decoded. `getJson` decodes them by the charset the
+`Content-Type` names (UTF-8 when it names none; SMARD sends none) with
+`TextDecoder`, which drops a leading byte order mark; an unknown charset label is a
+`SmardParseError`.
 
 **Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before
 `run()`: an EPIPE on stdout (`| head`) exits 0 quietly, an EPIPE on stderr is
