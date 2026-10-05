@@ -290,3 +290,66 @@ test("--user-agent rejects blank, control-character and non-Latin-1 values befor
   assert.equal(await run(["--user-agent", "smard-t\u00fcv\t1", "timestamps", "410", "DE", "hour"], cli.deps), 0);
   assert.equal(cli.mt.last().headers?.["User-Agent"], "smard-t\u00fcv\t1");
 });
+
+test("a malformed data file exits 1 with a parse error, never printed as a result", async () => {
+  // The bodies a mirror, a proxy or a changed format answered with in the 2026-10-05 sweep:
+  // the price-watch recipe named "80" the dearest price, the README sum skipped [2000].
+  const meta = { version: 1, created: 2 };
+  const bodies: unknown[] = [
+    null,
+    {},
+    [],
+    "text",
+    { error: "maintenance", series: null },
+    { meta_data: meta, series: "oops" },
+    { meta_data: meta, series: [[1000, "120.5"], [2000, "80"], [3000, 5]] },
+    { meta_data: meta, series: [[1000, 20], [2000], [3000, 20]] },
+    { meta_data: meta, series: [[1000, 20, 30]] },
+    { meta_data: meta, series: [null] },
+    { meta_data: meta, series: [[-5, 1]] },
+    { meta_data: meta, series: [[1.5, 1]] },
+    { series: [[1000, 1]] },
+  ];
+  for (const body of bodies) {
+    for (const argv of [
+      ["series", "830", "DE", "hour", "1000"],
+      ["latest", "836", "DE", "hour"],
+    ]) {
+      const cli = makeCli((req) =>
+        req.url.includes("index_") ? jsonResponse({ timestamps: [1000] }) : jsonResponse(body),
+      );
+      const code = await run(["--compact", ...argv], cli.deps);
+      assert.equal(code, 1, `${argv[0]} ${JSON.stringify(body)}`);
+      assert.deepEqual(cli.out, [], `${argv[0]} ${JSON.stringify(body)}`);
+      assert.match(cli.err.join("\n"), /^Error: (Unexpected response shape|Malformed data file) from \/app\/chart_data\//);
+    }
+  }
+});
+
+test("a malformed table_data file exits 1 with a parse error", async () => {
+  const meta = { version: 1, created: 2 };
+  const bodies: unknown[] = [
+    null,
+    {},
+    42,
+    { meta_data: meta, series: [[1000, 1]] },
+    { meta_data: meta, series: [{ values: [{ timestamp: 1000, versions: [{ value: "1", name: 1 }] }] }] },
+    { meta_data: meta, series: [{ values: [{ timestamp: "1000", versions: [] }] }] },
+    { meta_data: meta, series: [{ values: null }] },
+  ];
+  for (const body of bodies) {
+    const cli = makeCli(() => jsonResponse(body));
+    const code = await run(["--compact", "table", "835", "DE", "1000"], cli.deps);
+    assert.equal(code, 1, JSON.stringify(body));
+    assert.deepEqual(cli.out, []);
+    assert.match(cli.err.join("\n"), /^Error: (Unexpected response shape|Malformed table_data file) from \/app\/table_data\//);
+  }
+  // The live shape, extra keys included, passes unchanged.
+  const live = {
+    meta_data: { version: 1, created: 1698904671988 },
+    series: [{ values: [{ timestamp: 1698012000000, versions: [{ value: 10788.75, name: 1 }, { value: null, name: 2, info: "x" }] }] }],
+  };
+  const cli = makeCli(() => jsonResponse(live));
+  assert.equal(await run(["--compact", "table", "410", "DE", "1698012000000"], cli.deps), 0);
+  assert.deepEqual(JSON.parse(cli.out.join("\n")), live);
+});

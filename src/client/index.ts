@@ -1,6 +1,6 @@
 // Public entry point for the API client library.
 
-export { SmardClient } from "./client.js";
+export { SmardClient, checkSeriesResult, checkTableResult } from "./client.js";
 export { RequestEngine, DEFAULT_BASE_URL, baseUrlProblem, validateBaseUrl, MAX_RETRIES, MAX_RETRY_AFTER_MS, parseRetryAfter } from "./engine.js";
 export type { EngineOptions, RawResponse } from "./engine.js";
 export { MAX_TIMEOUT_MS, nodeHttpTransport } from "./http.js";

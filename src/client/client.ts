@@ -11,6 +11,9 @@
 //   client.series(410, "DE", "hour", ts)          // one window's data
 //   client.latest(410, "DE", "hour")              // newest window's data
 //
+// Every response is checked against its documented shape (the index, a data file,
+// a table_data file); anything else is a SmardParseError, never data.
+//
 // Every method checks its arguments before any request (a non-negative safe
 // integer filter/timestamp, a region in RegionValues, a resolution in
 // ResolutionValues) and rejects a bad one with a SmardValidationError.
@@ -33,6 +36,67 @@ const enc = (value: string | number): string => encodeURIComponent(String(value)
 /** A non-null, non-array JSON object. */
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** An epoch-millisecond timestamp as SMARD writes it: a non-negative safe integer. */
+function isEpochMs(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+/** A data value: a finite number, or `null` for a gap. */
+function isValue(value: unknown): value is number | null {
+  return value === null || (typeof value === "number" && Number.isFinite(value));
+}
+
+/**
+ * Check a `chart_data` data file against the documented shape and return it:
+ * `{"meta_data": {…}, "series": [[epochMs, number|null], …]}`. SMARD answers a window
+ * it has no file for with a 404, so anything else — `null`, `{}`, an array, an error
+ * object such as `{"error": "maintenance", "series": null}`, string values (`"80"`, which
+ * jq sorts above every number), a short or long tuple — is an error page or a changed
+ * format, and is a SmardParseError rather than data a caller computes on.
+ */
+export function checkSeriesResult(body: unknown, path: string): SeriesResult {
+  if (!isObject(body) || !isObject(body.meta_data) || !Array.isArray(body.series)) {
+    throw new SmardParseError(
+      `Unexpected response shape from ${path}: expected a JSON object with "meta_data" and a "series" array.`,
+    );
+  }
+  const bad = body.series.findIndex(
+    (p) => !Array.isArray(p) || p.length !== 2 || !isEpochMs(p[0]) || !isValue(p[1]),
+  );
+  if (bad >= 0) {
+    throw new SmardParseError(
+      `Malformed data file from ${path}: "series" point ${bad} is not [epoch-ms timestamp, number or null].`,
+    );
+  }
+  return body as unknown as SeriesResult;
+}
+
+/**
+ * Check a `table_data` file against the documented shape and return it:
+ * `{"meta_data": {…}, "series": [{"values": [{"timestamp": epochMs, "versions":
+ * [{"value": number|null, "name": …}, …]}, …]}, …]}`. Anything else is a SmardParseError,
+ * as for {@link checkSeriesResult}. Extra keys (a version's `info`) are kept.
+ */
+export function checkTableResult(body: unknown, path: string): TableResult {
+  if (!isObject(body) || !isObject(body.meta_data) || !Array.isArray(body.series)) {
+    throw new SmardParseError(
+      `Unexpected response shape from ${path}: expected a JSON object with "meta_data" and a "series" array.`,
+    );
+  }
+  const goodPoint = (p: unknown): boolean =>
+    isObject(p) &&
+    isEpochMs(p.timestamp) &&
+    Array.isArray(p.versions) &&
+    p.versions.every((v) => isObject(v) && isValue(v.value));
+  const bad = body.series.findIndex((e) => !isObject(e) || !Array.isArray(e.values) || !e.values.every(goodPoint));
+  if (bad >= 0) {
+    throw new SmardParseError(
+      `Malformed table_data file from ${path}: "series" entry ${bad} is not {"values": [{"timestamp": epoch-ms, "versions": [{"value": number or null}]}]}.`,
+    );
+  }
+  return body as unknown as TableResult;
 }
 
 export class SmardClient {
@@ -83,9 +147,8 @@ export class SmardClient {
     assertRegion(region);
     assertResolution(resolution);
     assertId("timestamp", timestamp);
-    return this.engine.getJson(
-      `/app/chart_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_${enc(resolution)}_${enc(timestamp)}.json`,
-    );
+    const path = `/app/chart_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_${enc(resolution)}_${enc(timestamp)}.json`;
+    return checkSeriesResult(await this.engine.getJson<unknown>(path), path);
   }
 
   /** Convenience: fetch the newest available window's data in one call. */
@@ -109,8 +172,7 @@ export class SmardClient {
     assertId("filter", filter);
     assertRegion(region);
     assertId("timestamp", timestamp);
-    return this.engine.getJson(
-      `/app/table_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_quarterhour_${enc(timestamp)}.json`,
-    );
+    const path = `/app/table_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_quarterhour_${enc(timestamp)}.json`;
+    return checkTableResult(await this.engine.getJson<unknown>(path), path);
   }
 }

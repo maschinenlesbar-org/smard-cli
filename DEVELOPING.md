@@ -87,15 +87,23 @@ returning an empty list.
 > Every argument is still `encodeURIComponent`-escaped and the engine's `buildUrl`
 > refuses a `.` / `..` segment, as defence in depth.
 >
-> Likewise, the **response** types (`SeriesResult` / `TableResult`) are a typed
-> **pass-through**: any successful (2xx) JSON body is parsed and returned cast to
-> the method's return type without structural validation. The one exception is
-> `timestamps()`, which validates that the body is a JSON object with a
-> `timestamps` array of safe integers (else throws `SmardParseError`: SMARD answers
-> a triple without data with a 404, never with an empty or absent index). `latest()`
-> on an index that lists no windows throws a `SmardError` rather than returning a
-> made-up empty result. For `series` / `latest` / `tableData`, treat the typing as a
-> convenience over the documented API shape, not a runtime guarantee.
+> Likewise, every **response** is checked against its documented shape, because
+> SMARD answers a triple or window without data with a 404 — never with an empty or
+> absent file — so any other 2xx body is an error page or a changed format, and a
+> `SmardParseError` (CLI exit 1), never data:
+>
+> - `timestamps()`: a JSON object with a `timestamps` array of safe integers.
+> - `series()` / `latest()` (`checkSeriesResult`): `{"meta_data": {…}, "series":
+>   [[epochMs, number|null], …]}` — every point a two-element array of a
+>   non-negative safe-integer timestamp and a finite number or `null`. `null`, `{}`,
+>   an error object, string values (`"80"`, which jq sorts above every number) and
+>   short or long tuples are refused.
+> - `tableData()` (`checkTableResult`): `{"meta_data": {…}, "series": [{"values":
+>   [{"timestamp": epochMs, "versions": [{"value": number|null, …}]}]}]}`; extra keys
+>   (a version's `info`) are kept.
+>
+> `latest()` on an index that lists no windows throws a `SmardError` rather than
+> returning a made-up empty result.
 
 ## Architecture
 

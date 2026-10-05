@@ -165,3 +165,16 @@ test("a path-steering argument is rejected before any request, never escaped and
   }
   assert.equal(mt.calls.length, 0);
 });
+
+test("series, latest and tableData return a well-formed file and reject anything else", async () => {
+  const good = { meta_data: { version: 1, created: 2 }, series: [[1000, 1.5], [2000, null], [3000, 0]] };
+  assert.deepEqual(await clientWith(constantJson(good)).series(410, "DE", "hour", 1000), good);
+  for (const body of [null, {}, [], { meta_data: {}, series: [[1000, "1"]] }, { meta_data: {}, series: [[1000]] }]) {
+    await assert.rejects(clientWith(constantJson(body)).series(410, "DE", "hour", 1000), SmardParseError, JSON.stringify(body));
+    const mt = makeMockTransport((req) =>
+      req.url.includes("index_") ? jsonResponse({ timestamps: [1000] }) : jsonResponse(body),
+    );
+    await assert.rejects(clientWith(mt).latest(410, "DE", "hour"), SmardParseError, JSON.stringify(body));
+    await assert.rejects(clientWith(constantJson(body)).tableData(410, "DE", 1000), SmardParseError, JSON.stringify(body));
+  }
+});

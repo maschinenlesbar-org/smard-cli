@@ -173,10 +173,11 @@ its stderr reader has gone away (`2>&1 | true`).
   and `smard filters`. For `table`, see the `table_data` note above.
 - **Exit `1` / network error** — connectivity, DNS, or a timeout. Try again,
   or raise the limit with `--timeout 60000`.
-- **Exit `1` with "Unexpected response shape"** — the index was not
-  `{"timestamps": [...]}` (an error page from a proxy, or a changed format), so
-  the CLI refuses to read it as "no data". `latest` also exits `1` if an index
-  lists no windows at all.
+- **Exit `1` with "Unexpected response shape" or "Malformed data file"** — the
+  index was not `{"timestamps": [...]}`, or a data file was not `{"meta_data": {…},
+  "series": [[timestamp, number or null], …]}` (an error page from a proxy, or a
+  changed format), so the CLI refuses to print it as data or read it as "no data".
+  `latest` also exits `1` if an index lists no windows at all.
 
 ## Global options
 
