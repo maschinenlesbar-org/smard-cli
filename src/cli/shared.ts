@@ -25,6 +25,21 @@ function parseNonNegativeInt(value: string): number | null {
   return n;
 }
 
+/**
+ * Wrap a value-parser so its option may be given only once: commander keeps the last of a
+ * repeated option and drops the others without a word (`--timeout 5000 --timeout 0` ran
+ * without a timeout). A repeat is a usage error naming the flag. A fresh program is built
+ * per `run()`, so the state lives as long as one parse.
+ */
+export function once<T>(flag: string, parse: (value: string) => T): (value: string) => T {
+  let seen = false;
+  return (value: string) => {
+    if (seen) throw new InvalidArgumentError(`${flag} was given more than once; give it once.`);
+    seen = true;
+    return parse(value);
+  };
+}
+
 /** commander value-parser: a non-negative integer. */
 export function parseIntArg(value: string): number {
   const n = parseNonNegativeInt(value);

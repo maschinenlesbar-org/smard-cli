@@ -97,12 +97,18 @@ export function assertHeaderValue(name: string, value: unknown): string {
  * The rule for a filter id or a window timestamp: a non-negative safe integer.
  * Anything else — a string, `-1`, `1.5`, `NaN`, `Infinity`, an integer beyond
  * `Number.MAX_SAFE_INTEGER` (which would be rounded to another file) — would put
- * a malformed or different path into the request.
+ * a malformed or different path into the request. A string or a bigint gets its own
+ * reason: `Invalid filter "4169". Expected a non-negative integer.` read as a
+ * contradiction to a caller who took the id from argv, an env var or a JSON config.
  */
-export const nonNegativeIntegerProblem: Problem<unknown> = (value) =>
-  typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+export const nonNegativeIntegerProblem: Problem<unknown> = (value) => {
+  if (typeof value === "string" || typeof value === "bigint") {
+    return `Expected a non-negative integer as a number, not a ${typeof value} (convert it with Number()).`;
+  }
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
     ? undefined
     : "Expected a non-negative integer.";
+};
 
 /** The rule for a region: one of `RegionValues` (case-sensitive, no padding). */
 export const regionProblem = oneOfProblem(RegionValues);

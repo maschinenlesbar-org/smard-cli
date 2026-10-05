@@ -11,7 +11,8 @@ import {
 } from "../src/client/validate.js";
 import * as lib from "../src/index.js";
 import { SmardValidationError } from "../src/client/errors.js";
-import { constantJson, jsonResponse, parity } from "./helpers.js";
+import { constantJson, jsonResponse, makeMockTransport, parity } from "./helpers.js";
+import { run } from "../src/cli/run.js";
 import type { HttpRequest } from "../src/client/http.js";
 
 const responder = (req: HttpRequest) =>
@@ -23,8 +24,50 @@ test("nonNegativeIntegerProblem accepts only non-negative safe integers", () => 
   for (const ok of [0, 1, 410, 1700000000000, Number.MAX_SAFE_INTEGER]) {
     assert.equal(nonNegativeIntegerProblem(ok), undefined, String(ok));
   }
-  for (const bad of [-1, 1.5, NaN, Infinity, -Infinity, 2 ** 53, 1e21, "410", "", null, undefined]) {
+  for (const bad of [-1, 1.5, NaN, Infinity, -Infinity, 2 ** 53, 1e21, null, undefined]) {
     assert.equal(nonNegativeIntegerProblem(bad), "Expected a non-negative integer.", String(bad));
+  }
+  // A numeric string or a bigint looks like a valid id: the reason says what is wrong.
+  for (const [bad, type] of [["410", "string"], ["", "string"], [410n, "bigint"]] as const) {
+    assert.equal(
+      nonNegativeIntegerProblem(bad),
+      `Expected a non-negative integer as a number, not a ${type} (convert it with Number()).`,
+      String(bad),
+    );
+  }
+});
+
+test("the library names a string id as the problem, not the value (05#2)", async () => {
+  const client = new SmardClient({ transport: makeMockTransport(responder).transport });
+  await assert.rejects(
+    client.timestamps("4169" as unknown as number, "DE-LU", "hour"),
+    (e: unknown) =>
+      e instanceof SmardValidationError &&
+      e.message === 'Invalid filter "4169". Expected a non-negative integer as a number, not a string (convert it with Number()).',
+  );
+});
+
+test("a repeated single-value option is a usage error, never last-one-wins", async () => {
+  const argvs = [
+    ["--timeout", "5000", "--timeout", "0", "timestamps", "410", "DE", "hour"],
+    ["--base-url", "http://127.0.0.1:1", "--base-url", "http://127.0.0.1:2", "timestamps", "410", "DE", "hour"],
+    ["--max-retries", "1", "--max-retries=2", "timestamps", "410", "DE", "hour"],
+    ["--user-agent", "a", "--user-agent", "b", "timestamps", "410", "DE", "hour"],
+    ["--max-response-bytes", "1", "--max-response-bytes", "2", "timestamps", "410", "DE", "hour"],
+    ["filters", "--group", "price", "--group", "generation"],
+  ];
+  for (const argv of argvs) {
+    const mt = makeMockTransport(responder);
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await run(argv, {
+      io: { out: (s) => out.push(s), err: (s) => err.push(s) },
+      createClient: (opts) => new SmardClient({ ...opts, transport: mt.transport }),
+    });
+    assert.equal(code, 1, argv.join(" "));
+    assert.equal(mt.calls.length, 0);
+    assert.deepEqual(out, []);
+    assert.match(err.join("\n"), /was given more than once; give it once/, argv.join(" "));
   }
 });
 

@@ -261,6 +261,11 @@ engine scrubs the base URL's userinfo (raw and percent-decoded) from error bodie
 details, transport error text and the `cause` chain
 (`test/conformance-p2-library-redaction.test.ts`).
 
+**Repeated options.** Every single-value option (`--base-url`, `--timeout`,
+`--user-agent`, `--max-retries`, `--max-response-bytes`, `filters --group`) is
+wrapped in `once()` (`shared.ts`): commander keeps the last of a repeated option
+and drops the others without a word, so a repeat is a usage error naming the flag.
+
 **Input validation.** A rule about what a request may contain belongs in the
 library, in [`validate.ts`](src/client/validate.ts) or next to the option it
 guards, as an exported `…Problem(value)` function that returns the reason a value

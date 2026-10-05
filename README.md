@@ -181,7 +181,8 @@ its stderr reader has gone away (`2>&1 | true`).
 
 ## Global options
 
-These apply to every command and may be given before *or* after it:
+These apply to every command and may be given before *or* after it, each at most once
+(a repeated option, like `filters --group` twice, is a usage error rather than "last one wins"):
 
 | Option | Description |
 | --- | --- |

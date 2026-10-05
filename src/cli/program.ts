@@ -10,7 +10,7 @@ import { defaultIO } from "./io.js";
 import { SmardClient } from "../client/client.js";
 import { MAX_TIMEOUT_MS } from "../client/http.js";
 import { MAX_RETRIES } from "../client/engine.js";
-import { parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg } from "./shared.js";
+import { once, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg } from "./shared.js";
 import { registerChartCommands } from "./commands/chart.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
 
@@ -48,24 +48,24 @@ export function buildProgram(deps: CliDeps = defaultDeps): Command {
         "generation, consumption, residual load and wholesale prices.",
     )
     .version(VERSION)
-    .option("--base-url <url>", "API base URL", parseBaseUrl, "https://www.smard.de")
+    .option("--base-url <url>", "API base URL", once("--base-url", parseBaseUrl), "https://www.smard.de")
     .option(
       "--timeout <ms>",
       "time limit per request in milliseconds, whole response included (0 = no timeout)",
-      parseBoundedInt(0, MAX_TIMEOUT_MS),
+      once("--timeout", parseBoundedInt(0, MAX_TIMEOUT_MS)),
       30_000,
     )
-    .option("--user-agent <ua>", "User-Agent header value", parseHeaderValue)
+    .option("--user-agent <ua>", "User-Agent header value", once("--user-agent", parseHeaderValue))
     .option(
       "--max-retries <n>",
       `retries for transient 429/503 responses and reset connections (0..${MAX_RETRIES}; each waits the server's Retry-After, up to 30 s)`,
-      parseBoundedInt(0, MAX_RETRIES),
+      once("--max-retries", parseBoundedInt(0, MAX_RETRIES)),
       2,
     )
     .option(
       "--max-response-bytes <n>",
       "cap response body size in bytes (0 = unlimited; default 100 MiB)",
-      parseIntArg,
+      once("--max-response-bytes", parseIntArg),
     )
     .option("--compact", "print JSON on a single line instead of pretty-printed")
     .showHelpAfterError();

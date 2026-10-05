@@ -184,7 +184,8 @@ smard --compact latest 4068 DE hour | jq '.series | length'   # count data point
 ## Global options
 
 These apply to every command and may be placed before or after it (before is
-recommended):
+recommended), each at most once — a repeated option (also `filters --group`) is a
+usage error:
 
 | Option | Description |
 | --- | --- |
