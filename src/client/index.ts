@@ -30,6 +30,8 @@ export {
   SmardParseError,
   SmardValidationError,
   redactUrl,
+  credentialsIn,
+  redactCredentials,
 } from "./errors.js";
 
 export { filtersByGroup, filterGroupProblem } from "./catalogue.js";
