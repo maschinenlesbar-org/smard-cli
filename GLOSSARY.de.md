@@ -126,6 +126,16 @@ Luxemburgs (Creos).
 Aggregationsintervalle einer Reihe. `quarterhour` (15 Minuten) ist zugleich die
 Granularität der ausführlicheren `table_data`-Antwort.
 
+**Zeitzone der Zeiträume.** Zeitstempel sind UTC-Epoch-Millisekunden, aber SMARDs
+Zeiträume folgen dem Kalender von **Europe/Berlin**: Ein Punkt der Auflösung `day`,
+`week` (Montag), `month` oder `year` beginnt um Mitternacht Berliner Zeit, also um
+22:00Z (Sommer) oder 23:00Z (Winter) am vorherigen UTC-Tag, und sein Wert ist die Summe
+über den Berliner Tag, die Woche, den Monat oder das Jahr (ein 23- oder 25-Stunden-Tag
+bei der Zeitumstellung). Beschriften Sie einen solchen Punkt mit seinem Berliner Datum
+(`TZ=Europe/Berlin` + jq's `strflocaltime("%Y-%m-%d")`), nie mit seinem UTC-Datum
+(`todate`), das den Vortag nennt: Der Wert für Sonntag, 04.10.2026, hat den Zeitstempel
+`2026-10-03T22:00:00Z`.
+
 ---
 
 ## Datenstrukturen

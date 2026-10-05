@@ -89,19 +89,41 @@ unique ts) so a boundary hour isn't listed twice.
 
 ## Step 4 — Format the rows
 
-Convert each `[epochMillis, value]` into a row with an ISO timestamp:
+How to label a point depends on the resolution, because SMARD's periods follow the
+**Europe/Berlin** calendar:
 
-```bash
-smard --compact series 410 DE hour "$ts" \
-| jq -r '.series[] | select(.[1] != null)
-         | [(.[0] / 1000 | todate), .[1]] | @csv'
-# 2026-06-08T11:00:00Z,58231.5
-```
+- **`hour` / `quarterhour`** — label each row with its ISO-8601 UTC instant (`todate`) and
+  say the column is UTC:
 
+  ```bash
+  smard --compact series 410 DE hour "$ts" \
+  | jq -r '.series[] | select(.[1] != null)
+           | [(.[0] / 1000 | todate), .[1]] | @csv'
+  # 2026-06-08T11:00:00Z,58231.5
+  ```
+
+  If the user wants Berlin wall-clock time, add it as a **second** column
+  (`TZ=Europe/Berlin` + `strflocaltime("%Y-%m-%d %H:%M")`) and keep the UTC column as the
+  key: the last Sunday in October repeats 02:00–02:59 Berlin time, so a wall-clock column
+  alone has duplicate rows.
+- **`day` / `week` / `month` / `year`** — each point starts at **Berlin midnight** (22:00Z
+  or 23:00Z on the previous UTC day), so label it with its **Berlin date**, never with
+  `todate`: `todate` names the previous day (Sunday 04.10.2026 becomes
+  `2026-10-03T22:00:00Z`, September becomes `2026-08-31T22:00:00Z`, January
+  `2025-12-31T23:00:00Z`). Set `TZ=Europe/Berlin` on jq, whatever the machine's zone:
+
+  ```bash
+  smard --compact latest 410 DE day \
+  | TZ=Europe/Berlin jq -r '.series[] | select(.[1] != null)
+           | [(.[0] / 1000 | strflocaltime("%Y-%m-%d")), .[1]] | @csv'
+  # "2026-10-04",1084745.62
+  ```
+
+  Use `"%Y-%m"` for `month`, `"%Y"` for `year`, and for `week` the Monday's date
+  (`"%Y-%m-%d"`, label the column "week starting").
 - Emit a header: `timestamp,<filter-label>` (use the catalogue `label`, plus the unit —
-  `MWh` or `EUR/MWh`).
-- Use ISO-8601 UTC (`todate`) for the timestamp column; mention these are UTC (SMARD's
-  underlying clock is CET/CEST — note the offset if local time matters to the user).
+  `MWh` or `EUR/MWh`); name the column `timestamp_utc` for sub-day rows and `date` (or
+  `month`, `week_starting`) for period rows.
 - For multiple filters side by side (e.g. load + price), build a **wide** table keyed on
   the shared timestamp via an outer join, leaving blanks where a series has no point.
 
@@ -126,6 +148,9 @@ Offer JSON (`{ timestamp, value }[]`) as an alternative, and offer a wider/longe
 - **Null tail + mid-series gaps** — drop or keep deliberately, never coerce to 0 (Step 3).
 - **Window overlap at boundaries** — de-duplicate on timestamp when stitching.
 - **One file covers a long span** — fetch only the windows you need, not the whole index.
+- **Period values carry Berlin dates** — a `day`/`week`/`month`/`year` point starts at
+  Berlin midnight; label it with `TZ=Europe/Berlin` + `strflocaltime`, never `todate`,
+  which names the previous day (Step 4).
 - **A 404 (exit `4`) means "not a window start"** (or no data for the triple), not
   "too old": old windows stay available. Take timestamps from the `timestamps` list.
 - **Don't use `table`** for export — SMARD seems to have stopped publishing `table_data`

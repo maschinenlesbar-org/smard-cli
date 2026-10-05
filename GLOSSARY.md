@@ -127,6 +127,15 @@ in 2018), used for historical data.
 intervals for a series. `quarterhour` (15-minute) is also the granularity of the
 richer `table_data` response.
 
+**Time zone of the periods.** Timestamps are UTC epoch milliseconds, but SMARD's
+periods follow the **Europe/Berlin** calendar: a `day`, `week` (Monday), `month` or
+`year` point starts at Berlin midnight, i.e. 22:00Z (summer) or 23:00Z (winter) on the
+previous UTC day, and its value is the sum over the Berlin day, week, month or year
+(a 23- or 25-hour day at a DST switch). Label such a point with its Berlin date
+(`TZ=Europe/Berlin` + jq's `strflocaltime("%Y-%m-%d")`), never with its UTC date
+(`todate`), which names the previous day: the value for Sunday 04.10.2026 has the
+timestamp `2026-10-03T22:00:00Z`.
+
 ---
 
 ## Data shapes

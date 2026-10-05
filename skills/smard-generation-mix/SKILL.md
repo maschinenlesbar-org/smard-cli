@@ -96,8 +96,19 @@ behind. Don't sum values from different timestamps.
 
 ## Step 5 — Present the breakdown
 
-Lead with the window (human-readable date from the timestamp) and the headline renewable
-share, then a ranked table:
+Lead with the window and the headline renewable share, then a ranked table. Name the
+window by its **Berlin date**: a `day` point starts at Berlin midnight (22:00Z or 23:00Z on
+the previous UTC day), so convert with `TZ=Europe/Berlin` and `strflocaltime`, never with
+`todate`, which names the previous day:
+
+```bash
+smard --compact latest 4068 DE day \
+| TZ=Europe/Berlin jq -r '[.series[] | select(.[1] != null)][-1][0] / 1000 | strflocaltime("%Y-%m-%d")'
+# 2026-10-04   (todate would say 2026-10-03T22:00:00Z)
+```
+
+For an `hour` window give the Berlin time too (`strflocaltime("%Y-%m-%d %H:%M")`, marked
+"Berlin time").
 
 ```
 German generation mix — day of 2026-06-08 (region DE)
@@ -126,6 +137,7 @@ Rules:
 ## Traps to respect
 
 - **Tail nulls** (Step 2) — the single most common mistake. Use last non-null.
+- **Dates are Berlin dates** (Step 5) — `todate` labels a `day` with the previous day.
 - **Nuclear (1224) is a flat/dead series.** Germany shut down its last reactors in
   April 2023; filter 1224's last non-null value is an old `0` (e.g. early 2024), not a
   live point. Don't present a stale 2024 zero as "today's nuclear output" — either omit
