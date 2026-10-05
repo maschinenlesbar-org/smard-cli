@@ -177,7 +177,9 @@ Lets the whole CLI run in tests with a mocked client and captured output — no
 subprocess.
 
 **Retry / backoff.** The engine automatically retries transient `429`
-(rate-limited) and `503` responses, up to `maxRetries` / `--max-retries` (default
+(rate-limited) and `503` responses, and connections reset mid-request
+(`ECONNRESET`, `EPIPE`, `ECONNABORTED`, undici's `UND_ERR_SOCKET`, anywhere in the
+error's `cause` chain), up to `maxRetries` / `--max-retries` (default
 `2`; an integer from `0` to `MAX_RETRIES`, 10 — the engine rejects anything else
 with `SmardValidationError`, and the CLI's parser uses the same constant). Each retry waits the response's `Retry-After` — delay-seconds or an
 IMF-fixdate HTTP-date, parsed by `parseRetryAfter` — or, without a usable one,
@@ -187,7 +189,19 @@ IMF-fixdate HTTP-date, parsed by `parseRetryAfter` — or, without a usable one,
 
 **maxResponseBytes.** A hard cap (default 100 MiB; `0` = unlimited) on response
 body size, defending against memory exhaustion; a breach aborts the request with
-`SmardResponseTooLargeError`.
+`SmardResponseTooLargeError`, whose message names `maxResponseBytes` and
+`--max-response-bytes`.
+
+**The transport contract (engine-enforced).** The engine holds the documented
+limits for any transport, not only the built-in one
+(`test/conformance-p5-transport-contract.test.ts`): it runs every call under the
+`timeoutMs` deadline and passes an `AbortSignal` in `HttpRequest.signal` (a `fetch`
+transport hands it on; the call rejects at the deadline either way), checks
+`maxResponseBytes` on the body a transport returns, reads headers from a plain
+object in any case, a `fetch` `Headers` or a `Map`, accepts any `ArrayBuffer` view
+or `ArrayBuffer` as the body (by internal slot, so from any realm), and turns a
+malformed response (no integer status 100–599, no headers object, no byte body)
+or anything thrown into a `SmardNetworkError`.
 
 **Engine option bounds.** The `RequestEngine` constructor (so `new SmardClient`)
 checks every numeric option that is set and throws `SmardValidationError` for a
