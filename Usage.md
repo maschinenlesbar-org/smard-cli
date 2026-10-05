@@ -189,7 +189,7 @@ recommended):
 | Option | Description |
 | --- | --- |
 | `-V, --version` | print the version |
-| `--base-url <url>` | API base URL (default `https://www.smard.de`; no query `?`, fragment `#` or surrounding whitespace; userinfo is shown as `***` in everything the CLI prints, a rejected value included) |
+| `--base-url <url>` | API base URL (default `https://www.smard.de`; no query `?`, fragment `#` or surrounding whitespace; a literal `%` in the userinfo is written `%25`; userinfo is shown as `***` in everything the CLI prints, a rejected value included) |
 | `--timeout <ms>` | time limit per request in ms, whole response included (`0` = no timeout; default `30000`; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value (non-blank; no control characters or characters above U+00FF — a usage error before any request) |
 | `--max-retries <n>` | retries for transient `429`/`503` responses (`0`–`10`, default `2`; each waits the server's `Retry-After`, up to 30 s) |

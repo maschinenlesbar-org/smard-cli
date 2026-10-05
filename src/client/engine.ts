@@ -141,6 +141,10 @@ function sanitizeServerText(text: string): string {
  *   appends request paths to the raw string, so a trailing space would request
  *   `/%20/app/...` on the mirror).
  *
+ * - a `%` in its userinfo starts a valid escape (`%25` for a literal one): Node decodes
+ *   the userinfo into the Authorization header and would otherwise fail every request
+ *   with "URI malformed".
+ *
  * Userinfo (`https://user:pw@mirror`) is allowed and sent as Basic auth. No reason
  * echoes the value, so a credential in it never reaches an error message.
  */
@@ -157,6 +161,15 @@ export function baseUrlProblem(value: unknown): string | undefined {
   }
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
   if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
+  // Node decodes the userinfo into the Authorization header and throws "URI malformed" for a
+  // "%" that isn't an escape — at request time, as a network error. Reject it here.
+  for (const part of [url.username, url.password]) {
+    try {
+      decodeURIComponent(part);
+    } catch {
+      return 'The user name or password has a "%" that is not followed by two hex digits; write a literal "%" as %25.';
+    }
+  }
   return undefined;
 }
 
