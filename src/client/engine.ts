@@ -18,7 +18,9 @@ import {
   SmardNetworkError,
   SmardParseError,
   SmardResponseTooLargeError,
+  SmardValidationError,
   credentialsIn,
+  cutForMessage,
   redactCredentials,
 } from "./errors.js";
 import { assertHeaderValue, assertValid, intRangeProblem, nonNegativeIntegerProblem } from "./validate.js";
@@ -265,6 +267,19 @@ function hasTransientCode(err: unknown, depth = 0): boolean {
   return hasTransientCode((err as { cause?: unknown }).cause, depth + 1);
 }
 
+/**
+ * Read a function option: `undefined` gives the default; anything else that is not a
+ * function throws a `SmardValidationError`. A string `transport` used to fail only at the
+ * first request, and a bad `sleep` as a raw TypeError on the first retry.
+ */
+function functionOption<F extends (...args: never[]) => unknown>(name: string, value: F | undefined, fallback: F): F {
+  if (value === undefined) return fallback;
+  if (typeof value !== "function") {
+    throw new SmardValidationError(`Invalid ${name}: Expected a function, got ${value === null ? "null" : typeof value}.`);
+  }
+  return value;
+}
+
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -284,6 +299,8 @@ export class RequestEngine {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(options: EngineOptions = {}) {
+    // A JavaScript caller may pass null for "no options"; treat it like undefined.
+    options = options ?? {};
     // Only `undefined` selects the default. An explicit blank or padded value is
     // rejected (SmardValidationError), as the CLI rejects it, rather than silently
     // meaning production or a different path on the mirror.
@@ -297,7 +314,7 @@ export class RequestEngine {
         return [raw];
       }
     });
-    this.transport = options.transport ?? nodeHttpTransport;
+    this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Only `undefined` selects the default User-Agent (some endpoints serve an HTML
     // challenge page, not JSON, without one). Any value passed must be a valid,
     // non-blank header value (no CR/LF or other controls, nothing above U+00FF),
@@ -322,7 +339,7 @@ export class RequestEngine {
     this.maxResponseBytes = options.maxResponseBytes === undefined
       ? DEFAULT_MAX_RESPONSE_BYTES
       : assertValid("maxResponseBytes", options.maxResponseBytes, nonNegativeIntegerProblem);
-    this.sleep = options.sleep ?? realSleep;
+    this.sleep = functionOption("sleep", options.sleep, realSleep);
   }
 
   /**
@@ -399,7 +416,7 @@ export class RequestEngine {
   /**
    * Build a fully-qualified URL from a path and optional query parameters.
    *
-   * Throws a SmardError for a path with a "." or ".." segment. The client puts its
+   * Throws a SmardValidationError for a path with a "." or ".." segment. The client puts its
    * arguments into the path with `encodeURIComponent`, which leaves those two
    * unchanged, and URL parsing then resolves them (a region of ".." would request
    * `/app/chart_data/410/index_hour.json`). Neither can name a filter, region or
@@ -411,8 +428,8 @@ export class RequestEngine {
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     const dotSegment = normalizedPath.split("/").find((s) => s === "." || s === "..");
     if (dotSegment !== undefined) {
-      throw new SmardError(
-        `Invalid path segment "${dotSegment}" in ${normalizedPath}: "." and ".." cannot be used as an id.`,
+      throw new SmardValidationError(
+        `Invalid path segment "${dotSegment}" in ${cutForMessage(normalizedPath)}: "." and ".." cannot be used as an id.`,
       );
     }
     const qs = query ? buildQueryString(query) : "";
@@ -532,7 +549,9 @@ export class RequestEngine {
     // `detail` came from the response body; strip control characters so a hostile
     // endpoint cannot inject terminal escape sequences via the stderr error
     // message that run.ts prints raw.
-    if (detail !== undefined) detail = sanitizeServerText(detail);
+    // It is cut at MAX_MESSAGE_VALUE_LENGTH: a 200 kB detail must not flood a CI log
+    // (`body` keeps the full text).
+    if (detail !== undefined) detail = cutForMessage(sanitizeServerText(detail).replace(/\s+/g, " ").trim());
     return new SmardApiError({
       status,
       url,

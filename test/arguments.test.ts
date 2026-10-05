@@ -178,3 +178,19 @@ test("parity: valid chart arguments send the identical request", async () => {
     assert.deepEqual(JSON.parse(cli.out), l.ok ? l.value : undefined);
   }
 });
+
+test("echoed values and server text are cut at 500 characters; null options mean none (P13)", async () => {
+  const long = "9".repeat(20_000) + "x";
+  const cli = { out: [] as string[], err: [] as string[] };
+  const code = await run(["timestamps", long, "DE", "hour"], {
+    io: { out: (s) => cli.out.push(s), err: (s) => cli.err.push(s) },
+    createClient: (opts) => new SmardClient({ ...opts, transport: makeMockTransport(responder).transport }),
+  });
+  assert.equal(code, 1);
+  assert.ok(cli.err.join("\n").length < 700, `${cli.err.join("\n").length} characters`);
+  assert.match(cli.err.join("\n"), /^Error: Invalid filter "9{500}…"\. Expected a non-negative integer\.$/);
+  const detail = "boom ".repeat(10_000);
+  const client = new SmardClient({ transport: makeMockTransport(() => jsonResponse({ detail }, 500)).transport, maxRetries: 0 });
+  await assert.rejects(client.timestamps(410, "DE", "hour"), (e: unknown) => e instanceof Error && e.message.length < 700);
+  assert.doesNotThrow(() => new SmardClient(null as unknown as undefined));
+});

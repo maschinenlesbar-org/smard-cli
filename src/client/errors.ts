@@ -67,6 +67,19 @@ export function redactCredentials(text: string, credentials: readonly string[]):
   return out;
 }
 
+/**
+ * Longest echoed value or server text (in characters) an error message shows. A
+ * 20 000-character argument would otherwise put the whole input on one stderr line, and
+ * a server `detail` could flood a CI log. Properties such as `SmardApiError.body` keep the
+ * full value.
+ */
+export const MAX_MESSAGE_VALUE_LENGTH = 500;
+
+/** `text` cut to MAX_MESSAGE_VALUE_LENGTH characters, ending in "…" when cut. */
+export function cutForMessage(text: string): string {
+  return text.length > MAX_MESSAGE_VALUE_LENGTH ? `${text.slice(0, MAX_MESSAGE_VALUE_LENGTH)}…` : text;
+}
+
 /** Base class for every error originating from this client. */
 export class SmardError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -119,7 +132,7 @@ export class SmardApiError extends SmardError {
     // Say that the status persisted through retries, so a user knows whether raising
     // --max-retries could help.
     const retryPart = retries > 0 ? ` (after ${retries} ${retries === 1 ? "retry" : "retries"})` : "";
-    super(`HTTP ${args.status} for ${args.method} ${url}${detailPart}${retryPart}`);
+    super(`HTTP ${args.status} for ${args.method} ${cutForMessage(url)}${detailPart}${retryPart}`);
     this.status = args.status;
     this.url = url;
     this.method = args.method;

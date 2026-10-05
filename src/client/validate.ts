@@ -10,7 +10,7 @@
 //   made. Methods that return a promise call it inside the async body, so they
 //   reject rather than throw synchronously; constructors throw.
 
-import { SmardValidationError } from "./errors.js";
+import { SmardValidationError, cutForMessage } from "./errors.js";
 import { RegionValues, ResolutionValues, type Region, type Resolution } from "./enums.js";
 
 /** A validation rule: the reason `value` is invalid, or `undefined` when it is valid. */
@@ -42,7 +42,8 @@ export function oneOfProblem(allowed: readonly string[]): Problem<unknown> {
  * Like {@link assertValid}, but with the message the CLI has always printed for
  * a rejected argument value, which echoes the value:
  * `Invalid <name> "<value>". <reason>`. `shown` is what to echo (the raw argv
- * string where the CLI parsed it into another type); it defaults to the value.
+ * string where the CLI parsed it into another type); it defaults to the value, and is
+ * cut at MAX_MESSAGE_VALUE_LENGTH characters.
  */
 export function assertArgument<T>(
   name: string,
@@ -51,7 +52,8 @@ export function assertArgument<T>(
   shown: string = String(value),
 ): T {
   const reason = problem(value);
-  if (reason !== undefined) throw new SmardValidationError(`Invalid ${name} "${shown}". ${reason}`);
+  // The echoed value is cut: a 20 000-character argument must not fill a stderr line.
+  if (reason !== undefined) throw new SmardValidationError(`Invalid ${name} "${cutForMessage(shown)}". ${reason}`);
   return value as T;
 }
 

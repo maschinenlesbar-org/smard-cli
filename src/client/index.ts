@@ -32,6 +32,8 @@ export {
   redactUrl,
   credentialsIn,
   redactCredentials,
+  cutForMessage,
+  MAX_MESSAGE_VALUE_LENGTH,
 } from "./errors.js";
 
 export { filtersByGroup, filterGroupProblem } from "./catalogue.js";

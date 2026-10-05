@@ -261,6 +261,16 @@ engine scrubs the base URL's userinfo (raw and percent-decoded) from error bodie
 details, transport error text and the `cause` chain
 (`test/conformance-p2-library-redaction.test.ts`).
 
+**Error classes and messages.** Every rejected input is a `SmardValidationError`,
+never a raw `TypeError`: a non-function `transport` or `sleep` fails in the
+constructor, `null` options count as none, a `.`/`..` path segment in direct engine
+use is a validation error too. Echoed values and server text (an API `detail`) are
+cut at `MAX_MESSAGE_VALUE_LENGTH` (500) characters with `cutForMessage`;
+`SmardApiError.body` keeps the full text.
+`test/conformance-p8-p9-p13-responses-and-errors.test.ts` holds the shared checks
+for the declared charset (P8), 2xx bodies without the documented shape (P9) and
+wrong-typed input (P13).
+
 **Repeated options.** Every single-value option (`--base-url`, `--timeout`,
 `--user-agent`, `--max-retries`, `--max-response-bytes`, `filters --group`) is
 wrapped in `once()` (`shared.ts`): commander keeps the last of a repeated option
