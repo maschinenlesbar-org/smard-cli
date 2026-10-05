@@ -37,8 +37,9 @@ test("the engine rejects out-of-range numeric options at construction", () => {
     ["maxResponseBytes", NaN, "Expected a non-negative integer."],
     ["maxResponseBytes", 1.5, "Expected a non-negative integer."],
     ["maxResponseBytes", 1e20, "Expected a non-negative integer."],
-    ["retryDelayMs", -1, "Expected a non-negative integer."],
-    ["retryDelayMs", Infinity, "Expected a non-negative integer."],
+    ["retryDelayMs", -1, "Expected an integer from 0 to 30000."],
+    ["retryDelayMs", Infinity, "Expected an integer from 0 to 30000."],
+    ["retryDelayMs", 30_001, "Expected an integer from 0 to 30000."],
   ];
   for (const [name, value, reason] of cases) {
     const mt = makeMockTransport(() => jsonResponse({}));

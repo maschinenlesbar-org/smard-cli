@@ -181,11 +181,18 @@ subprocess.
 (`ECONNRESET`, `EPIPE`, `ECONNABORTED`, undici's `UND_ERR_SOCKET`, anywhere in the
 error's `cause` chain), up to `maxRetries` / `--max-retries` (default
 `2`; an integer from `0` to `MAX_RETRIES`, 10 — the engine rejects anything else
-with `SmardValidationError`, and the CLI's parser uses the same constant). Each retry waits the response's `Retry-After` — delay-seconds or an
-IMF-fixdate HTTP-date, parsed by `parseRetryAfter` — or, without a usable one,
-`retryDelayMs * attempt` (linear backoff). A `Retry-After` longer than
-`MAX_RETRY_AFTER_MS` (30 s) is not retried: the `SmardApiError` surfaces at once.
-`SmardApiError.isRetryable` flags these statuses.
+with `SmardValidationError`, and the CLI's parser uses the same constant). Each
+retry waits `retryDelayMs * attempt` (linear backoff, `retryDelayMs` an integer
+`0`–`30000`, default `200`), or the response's `Retry-After` — delay-seconds or an
+IMF-fixdate HTTP-date, parsed by `parseRetryAfter` — when that is longer: the
+header can lengthen a wait, never shorten it, so `Retry-After: 0` or a date in the
+past never makes a zero-delay burst. A `Retry-After` longer than
+`MAX_RETRY_AFTER_MS` (30 s) is not retried: the `SmardApiError` surfaces at once,
+says "the server asked to retry after N s, longer than the 30 s the client waits;
+not retried" and carries `retryAfterMs`. After spent retries the message ends
+"(after N retries)" and `SmardApiError.retries` holds the count.
+`SmardApiError.isRetryable` flags these statuses
+(`test/conformance-p6-retry-policy.test.ts`).
 
 **maxResponseBytes.** A hard cap (default 100 MiB; `0` = unlimited) on response
 body size, defending against memory exhaustion; a breach aborts the request with
@@ -206,8 +213,8 @@ or anything thrown into a `SmardNetworkError`.
 **Engine option bounds.** The `RequestEngine` constructor (so `new SmardClient`)
 checks every numeric option that is set and throws `SmardValidationError` for a
 value out of range: `timeoutMs` an integer from `0` to `MAX_TIMEOUT_MS`,
-`maxRetries` from `0` to `MAX_RETRIES`, `maxResponseBytes` and `retryDelayMs`
-non-negative integers. `-1`, `NaN`, `1.5` or `Infinity` would otherwise silently
+`maxRetries` from `0` to `MAX_RETRIES`, `retryDelayMs` from `0` to
+`MAX_RETRY_AFTER_MS` (30 000), `maxResponseBytes` a non-negative integer. `-1`, `NaN`, `1.5` or `Infinity` would otherwise silently
 switch off the timeout or the size cap, or retry without bound. `undefined` keeps
 the default, and `0` keeps its documented meaning. A `userAgent` must be a valid
 header value (`headerValueProblem`: no C0 control character other than tab — so

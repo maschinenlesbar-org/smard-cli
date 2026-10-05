@@ -57,14 +57,15 @@ export interface EngineOptions {
    * Number of automatic retries for transient (429/503) responses and reset
    * connections (`ECONNRESET`, `UND_ERR_SOCKET`, …), an integer from 0 to
    * MAX_RETRIES (10); defaults to 2. A refused connection, a DNS failure and a
-   * timeout are not retried. Each waits the response's `Retry-After`
-   * (up to `MAX_RETRY_AFTER_MS`; a longer one is not retried), or else
-   * `retryDelayMs * attempt`.
+   * timeout are not retried. Each waits `retryDelayMs * attempt`, or the
+   * response's `Retry-After` when that is longer (up to `MAX_RETRY_AFTER_MS`; a
+   * longer one is not retried, and the SmardApiError says so).
    */
   maxRetries?: number;
   /**
-   * Base backoff between retries in milliseconds (grows linearly; a non-negative
-   * integer, default 200); used without a Retry-After.
+   * Base backoff between retries in milliseconds (grows linearly), an integer
+   * 0..`MAX_RETRY_AFTER_MS` (30 000); default 200. It is also the floor under a
+   * `Retry-After`: the header can lengthen a wait, never shorten it.
    */
   retryDelayMs?: number;
   /**
@@ -83,8 +84,9 @@ const DEFAULT_MAX_RESPONSE_BYTES = 100 * 1024 * 1024;
 /**
  * Longest `Retry-After` the engine waits out before retrying a 429/503. When the
  * server asks for longer, the engine does not retry at all and surfaces the error at
- * once: retrying early would only land inside the window the server asked us to wait
- * out, and a hostile value must not stall the CLI.
+ * once, with a message naming the requested wait: retrying early would only land
+ * inside the window the server asked us to wait out, and a hostile value must not
+ * stall the CLI.
  */
 export const MAX_RETRY_AFTER_MS = 30_000;
 
@@ -313,7 +315,9 @@ export class RequestEngine {
       : assertValid("maxRetries", options.maxRetries, intRangeProblem(0, MAX_RETRIES));
     this.retryDelayMs = options.retryDelayMs === undefined
       ? 200
-      : assertValid("retryDelayMs", options.retryDelayMs, nonNegativeIntegerProblem);
+      // Bounded like a Retry-After wait: a larger value overflowed Node's timer and fired
+      // after 1 ms, a burst rather than a backoff.
+      : assertValid("retryDelayMs", options.retryDelayMs, intRangeProblem(0, MAX_RETRY_AFTER_MS));
     this.maxResponseBytes = options.maxResponseBytes === undefined
       ? DEFAULT_MAX_RESPONSE_BYTES
       : assertValid("maxResponseBytes", options.maxResponseBytes, nonNegativeIntegerProblem);
@@ -470,20 +474,26 @@ export class RequestEngine {
         throw new SmardResponseTooLargeError(sizeLimitMessage(this.maxResponseBytes));
       }
       const retryable = status === 429 || status === 503;
-      if (idempotent && retryable && attempt < this.maxRetries) {
-        // Honour Retry-After; without a usable one, back off linearly. A Retry-After
-        // beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at once.
-        const retryAfter = parseRetryAfter(responseHeaders["retry-after"]);
-        if (retryAfter === undefined || retryAfter <= MAX_RETRY_AFTER_MS) {
-          attempt += 1;
-          await this.sleep(retryAfter ?? this.retryDelayMs * attempt);
-          continue;
-        }
+      // A Retry-After beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at
+      // once and names the wait the server asked for.
+      const retryAfter = retryable ? parseRetryAfter(responseHeaders["retry-after"]) : undefined;
+      const tooLong = retryAfter !== undefined && retryAfter > MAX_RETRY_AFTER_MS;
+      if (idempotent && retryable && !tooLong && attempt < this.maxRetries) {
+        attempt += 1;
+        // Back off linearly from retryDelayMs. A Retry-After can ask for longer, never for
+        // less: `Retry-After: 0` or a date in the past turned the retries into a zero-delay
+        // burst against a server that had just asked for less load.
+        const backoff = this.retryDelayMs * attempt;
+        await this.sleep(retryAfter === undefined ? backoff : Math.max(retryAfter, backoff));
+        continue;
       }
 
       const contentType = String(responseHeaders["content-type"] ?? "");
       if (status < 200 || status >= 300) {
-        throw this.toApiError(method, url, status, body);
+        throw this.toApiError(method, url, status, body, {
+          retries: attempt,
+          ...(tooLong ? { retryAfterMs: retryAfter } : {}),
+        });
       }
 
       return { data: body, contentType, status };
@@ -501,7 +511,13 @@ export class RequestEngine {
     }
   }
 
-  private toApiError(method: string, url: string, status: number, body: Buffer): SmardApiError {
+  private toApiError(
+    method: string,
+    url: string,
+    status: number,
+    body: Buffer,
+    retry: { retries: number; retryAfterMs?: number } = { retries: 0 },
+  ): SmardApiError {
     // The body is kept on the error (`body`) and may echo the request URL: scrub it.
     const text = this.scrub(body.toString("utf8"));
     let detail: string | undefined;
@@ -516,6 +532,14 @@ export class RequestEngine {
     // endpoint cannot inject terminal escape sequences via the stderr error
     // message that run.ts prints raw.
     if (detail !== undefined) detail = sanitizeServerText(detail);
-    return new SmardApiError({ status, url, method, body: text, detail });
+    return new SmardApiError({
+      status,
+      url,
+      method,
+      body: text,
+      detail,
+      retries: retry.retries,
+      ...(retry.retryAfterMs === undefined ? {} : { retryAfterMs: retry.retryAfterMs, maxRetryAfterMs: MAX_RETRY_AFTER_MS }),
+    });
   }
 }

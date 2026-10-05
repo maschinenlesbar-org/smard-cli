@@ -186,7 +186,7 @@ These apply to every command and may be given before *or* after it:
 | `--base-url <url>` | API base URL (default `https://www.smard.de`; an `http:`/`https:` URL, optionally with a path prefix; a query `?`, fragment `#`, surrounding whitespace or a `%` in the userinfo that isn't an escape — write a literal `%` as `%25` — is a usage error). Userinfo (`https://user:pw@mirror`) is sent as Basic auth and shown as `***` in everything the CLI prints, a rejected `--base-url` included |
 | `--timeout <ms>` | Time limit per request in ms, reading the whole response included (`0` = no timeout; default `30000`; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value (non-blank; no control characters or characters above U+00FF — a usage error before any request) |
-| `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`). Each retry waits the server's `Retry-After` (up to 30 s; a longer one is not retried) or else backs off linearly |
+| `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`). Each retry backs off linearly (200 ms × attempt) or waits the server's `Retry-After` when that is longer (up to 30 s; a longer one is not retried, and the error names the wait) |
 | `--max-response-bytes <n>` | Cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 
 ## Learn more
