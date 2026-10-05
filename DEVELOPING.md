@@ -171,6 +171,12 @@ errors. Sits between the client and the transport.
 **RawResponse.** The engine's raw result: `{ data: Buffer, contentType, status }`
 — raw bytes, never lossily decoded.
 
+**Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before
+`run()`: an EPIPE on stdout (`| head`) exits 0 quietly, an EPIPE on stderr is
+ignored so a failed run keeps its exit code, and any other stdout error prints one
+`Output error:` line and exits 1. `test/conformance-p7-pipes-exit-codes.test.ts`
+runs the built bin to check it.
+
 **CliDeps / CliIO.** The dependency-injection seam for the CLI
 ([`io.ts`](src/cli/io.ts)): a client factory plus an I/O object (`out`/`err`/…).
 Lets the whole CLI run in tests with a mocked client and captured output — no

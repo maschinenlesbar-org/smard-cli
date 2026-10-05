@@ -156,6 +156,10 @@ both `smard --compact latest …` and `smard latest … --compact` do the same t
 | `1` | any other error: network failure, timeout, parse error, non-404 API status |
 | non-zero | usage / invalid argument (bad region, non-integer filter, etc.) |
 
+A reader that stops early (`| head`, `| jq` exiting on its first match) ends the
+run with exit `0` and no stack trace; a failed run keeps its exit code even when
+its stderr reader has gone away (`2>&1 | true`).
+
 ## Troubleshooting
 
 - **`command not found: smard`** — the global npm bin directory isn't on your
