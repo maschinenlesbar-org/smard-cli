@@ -326,6 +326,12 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`client.test.ts`** — every method's URL mapping, including the `latest` index→data flow — mocked transport.
 - **`cli.test.ts`** — end-to-end command parsing, validation and exit codes — mocked client.
 - **`validate.test.ts`** — `assertValid`, the `SmardValidationError` exit-code mapping and the `parity()` helper.
+- **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan of
+  2026-10-06; only the adapter block at the top differs per repo): P1 CLI output redaction,
+  P2 library redaction, P4/P19 base-URL validation (the P19 case is skipped: smard reads no
+  environment variable), P5 the engine-enforced transport contract, P6 the retry policy, P7
+  closed pipes (spawns the built bin), P8/P9/P13 charset, response shapes and validation
+  errors.
 
 ## Continuous integration
 
