@@ -131,7 +131,8 @@ stdout into `jq` stays clean.
 # Count data points in a series window
 smard --compact latest 4068 DE hour | jq '.series | length'
 
-# Sum all non-null values in a window (total MWh)
+# Sum all non-null values in a window (total MWh of the window — the published part
+# of one week for an `hour` file, not a day)
 smard --compact latest 4068 DE hour | jq '[.series[][1] | select(. != null)] | add'
 
 # Save a window to a file

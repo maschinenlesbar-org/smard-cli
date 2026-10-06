@@ -57,7 +57,9 @@ as with `DE-LU`, checked 26 Sep 2026), but `DE-LU` is the documented bidding-zon
 
 **Resolution: the day-ahead market is quarter-hourly** (since 1 Oct 2025; before that the
 `quarterhour` series just repeats each hourly price). The price series have 96 prices per
-day at `quarterhour` (checked 15 Sep 2026 for DE-LU, France and Austria), and each `hour`
+day at `quarterhour` (checked 15 Sep 2026 for DE-LU, France and Austria) — 92 on the last
+Sunday in March and 100 on the last Sunday in October (26.10.2025 had 100), so group by
+the Berlin date as Step 3 does rather than counting 96 slots. Each `hour`
 value is the **mean of its four quarter-hours** — e.g. DE-LU 16.09.2026 13:00 =
 97.51 = mean(104.70, 98.37, 96.56, 90.40). Use `hour` for an overview or an hourly average;
 use `quarterhour` for "when is it cheapest?" and load shifting, because the hourly mean
