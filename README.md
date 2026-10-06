@@ -18,7 +18,7 @@ residual load and wholesale prices as clean JSON you can pipe straight into
 - **No credentials to manage** — the SMARD API is fully open; this tool only reads.
 
 > Want to use this as a TypeScript library or understand how it's built?
-> See **[DEVELOPING.md](DEVELOPING.md)**.
+> See **[DEVELOPING.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/DEVELOPING.md)**.
 
 ## Install
 
@@ -97,7 +97,7 @@ resolutions                                              valid resolution values
 
 ## Common tasks
 
-A few recipes to get going — see **[Usage.md](Usage.md)** for the full,
+A few recipes to get going — see **[Usage.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/Usage.md)** for the full,
 use-case-driven set.
 
 ```bash
@@ -198,10 +198,10 @@ These apply to every command and may be given before *or* after it, each at most
 
 ## Learn more
 
-- **[SKILLS.md](SKILLS.md)** — Claude Code Agent Skills that drive this CLI for energy-mix, price-watch and time-series-export tasks.
-- **[Usage.md](Usage.md)** — full use-case-driven cookbook.
-- **[GLOSSARY.md](GLOSSARY.md)** — every domain term, filter group, region code, and data shape explained.
-- **[DEVELOPING.md](DEVELOPING.md)** — TypeScript library usage, architecture, testing, CI.
+- **[SKILLS.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/SKILLS.md)** — Claude Code Agent Skills that drive this CLI for energy-mix, price-watch and time-series-export tasks.
+- **[Usage.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/Usage.md)** — full use-case-driven cookbook.
+- **[GLOSSARY.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/GLOSSARY.md)** — every domain term, filter group, region code, and data shape explained.
+- **[DEVELOPING.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/DEVELOPING.md)** — TypeScript library usage, architecture, testing, CI.
 
 ## Data license
 

@@ -172,6 +172,10 @@ src/
   offline `filters`/`regions`/`resolutions` pass `makesRequests: false`); help, version
   and usage errors never warn, stdout and the exit code are unchanged, and the library
   never warns. `test/conformance-p20-cleartext-warning.test.ts` is the shared check (P20).
+- **README links (P21).** README.md ships in the npm tarball and is shown on npmjs.com,
+  so a relative link in it must point to a file the package ships (`files` in
+  package.json); any other document is linked by its absolute GitHub URL.
+  `test/conformance-p21-readme-links.test.ts` checks every relative link.
 
 ### Library / technical terms
 
