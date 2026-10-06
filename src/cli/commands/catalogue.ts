@@ -16,7 +16,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     .action(
       action(deps, async ({ global, opts }) => {
         renderJson(deps, global, filtersByGroup(opts["group"] as FilterGroup | undefined));
-      }),
+      }, false),
     );
 
   program
@@ -25,7 +25,7 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     .action(
       action(deps, async ({ global }) => {
         renderJson(deps, global, [...RegionValues]);
-      }),
+      }, false),
     );
 
   program
@@ -34,6 +34,6 @@ export function registerCatalogueCommands(program: Command, deps: CliDeps): void
     .action(
       action(deps, async ({ global }) => {
         renderJson(deps, global, [...ResolutionValues]);
-      }),
+      }, false),
     );
 }

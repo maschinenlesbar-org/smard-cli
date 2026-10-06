@@ -5,7 +5,7 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import type { CliDeps } from "./io.js";
 import { assertArgument, headerValueProblem, nonNegativeIntegerProblem } from "../client/validate.js";
-import { baseUrlProblem, type EngineOptions } from "../client/engine.js";
+import { DEFAULT_BASE_URL, baseUrlProblem, cleartextProblem, type EngineOptions } from "../client/engine.js";
 
 /**
  * Parse a plain non-negative decimal integer string. Validates the *raw string*
@@ -162,17 +162,27 @@ export interface ActionContext {
  * client construction. The callback receives a context (client + resolved global
  * options + this command's options) and the command's positional arguments.
  *
+ * Before the client is built (so before any request), a command that contacts the API
+ * (`makesRequests`, the default) checks the base URL: plain `http:` to a remote host gets
+ * one `warning: <cleartextProblem sentence>` line on stderr. The catalogue commands answer
+ * from built-in lists and pass `false`. An action runs once per run, so the warning does
+ * too; help, version and usage errors never reach an action and never warn. stdout is
+ * never touched.
+ *
  * Commander invokes actions as (arg1, ..., argN, options, command); we slice off
  * the trailing options object and command instance to recover the positionals.
  */
 export function action(
   deps: CliDeps,
   fn: (ctx: ActionContext, positionals: string[]) => Promise<void>,
+  makesRequests = true,
 ): (...args: unknown[]) => Promise<void> {
   return async (...args: unknown[]) => {
     const command = args[args.length - 1] as Command;
     const positionals = args.slice(0, Math.max(0, args.length - 2)) as string[];
     const global = command.optsWithGlobals() as GlobalOptions;
+    const cleartext = makesRequests ? cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL) : undefined;
+    if (cleartext !== undefined) deps.io.err(`warning: ${cleartext}`);
     const client = deps.createClient(toEngineOptions(global));
     await fn({ client, global, opts: command.opts() }, positionals);
   };

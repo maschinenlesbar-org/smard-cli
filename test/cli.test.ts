@@ -368,3 +368,18 @@ test("a negative timestamp in the index is the server's malformed index, never t
     assert.equal(cli.mt.calls.length, 1, "no data file is requested");
   }
 });
+
+test("the catalogue commands make no request and never warn about a plain-http: base URL", async () => {
+  for (const argv of [["filters"], ["regions"], ["resolutions"]]) {
+    const out: string[] = [];
+    const err: string[] = [];
+    let requests = 0;
+    const code = await run(["--base-url", "http://mirror.example", ...argv], {
+      io: { out: (s) => out.push(s), err: (s) => err.push(s) },
+      createClient: (opts) => new SmardClient({ ...opts, transport: async () => { requests++; throw new Error("no request expected"); } }),
+    });
+    assert.equal(code, 0, err.join("\n"));
+    assert.equal(requests, 0);
+    assert.deepEqual(err, []);
+  }
+});

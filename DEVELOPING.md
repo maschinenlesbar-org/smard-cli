@@ -162,6 +162,16 @@ src/
   delimit a password that holds a space, quote, `#`, `?` or `/`; the exact strings
   can. `test/conformance-p1-cli-redaction.test.ts` checks ten such passwords in
   seven URL shapes on every echo path.
+- **Plain `http:` warning (CLI).** `cleartextProblem(baseUrl, secrets?)` (`engine.ts`,
+  exported) returns one sentence when requests to `baseUrl` would travel unencrypted —
+  `requests to <host> are sent unencrypted (http:, not https:)`, or `the base URL's
+  credentials are sent unencrypted to <host> (http:, not https:)` with userinfo — and
+  `undefined` for `https:`, an unparseable URL and loopback hosts. `<host>` is `url.host`,
+  never the userinfo. The `action()` wrapper writes `warning: <sentence>` to stderr once
+  per run, before the client is built, for every command that contacts the API (the
+  offline `filters`/`regions`/`resolutions` pass `makesRequests: false`); help, version
+  and usage errors never warn, stdout and the exit code are unchanged, and the library
+  never warns. `test/conformance-p20-cleartext-warning.test.ts` is the shared check (P20).
 
 ### Library / technical terms
 
