@@ -88,6 +88,9 @@ export type LibOutcome =
  * or both send the identical request. A synchronous throw from the library call
  * (constructor validation) is captured like a rejection.
  */
+/** A `sleep` that returns at once, for clients whose retries a test drives. */
+export const noWait = async (): Promise<void> => {};
+
 export async function parity(
   argv: string[],
   call: (transport: Transport) => unknown,
@@ -98,7 +101,8 @@ export async function parity(
   const err: string[] = [];
   const deps: CliDeps = {
     io: { out: (s) => out.push(s), err: (s) => err.push(s) },
-    createClient: (opts) => defaultDeps.createClient({ ...opts, transport: mt.transport }),
+    // The backoff never waits: a parity run that retries would otherwise sleep for real.
+    createClient: (opts) => defaultDeps.createClient({ ...opts, transport: mt.transport, sleep: noWait }),
   };
   const code = await run(argv, deps);
   const cliRequests = mt.calls.slice();

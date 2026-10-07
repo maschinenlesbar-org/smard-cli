@@ -6,7 +6,7 @@ import { intRangeProblem } from "../src/client/validate.js";
 import * as lib from "../src/index.js";
 import { SmardClient } from "../src/client/client.js";
 import { SmardApiError, SmardValidationError } from "../src/client/errors.js";
-import { jsonResponse, makeMockTransport, parity } from "./helpers.js";
+import { jsonResponse, makeMockTransport, noWait, parity } from "./helpers.js";
 
 test("intRangeProblem accepts integers in range only", () => {
   const p = intRangeProblem(0, 10);
@@ -90,7 +90,7 @@ test("parity: out-of-range engine options are rejected by the CLI and the librar
 test("parity: maxRetries at the bound sends the same number of requests", async () => {
   const { cli, lib: l } = await parity(
     ["--compact", "--max-retries", String(MAX_RETRIES), "timestamps", "410", "DE", "hour"],
-    (transport) => new SmardClient({ transport, maxRetries: MAX_RETRIES }).timestamps(410, "DE", "hour"),
+    (transport) => new SmardClient({ transport, maxRetries: MAX_RETRIES, sleep: noWait }).timestamps(410, "DE", "hour"),
     busy,
   );
   assert.equal(cli.code, 1);
