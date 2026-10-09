@@ -213,6 +213,16 @@ für ein aktuelles Fenster ist daher zu erwarten.
 (optional nur eine `--group`), die gültigen Regionscodes und die gültigen Auflösungswerte
 ausgeben – lokal aus den mitgelieferten Enums, ohne Netzwerkaufruf.
 
+**Log-Eintrag.** Jede Diagnosezeile, die die CLI auf stderr schreibt: ein Zeitstempel,
+eine Stufe (`ERROR`, `WARN`, `INFO`) und ein Thema `smard.<Bereich>`, als Text (im Stil
+von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Zeile. Die Bereiche:
+`cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler), `api` (die Antworten
+der API: ein Fehlerstatus wie das `404` für ein Fenster ohne Daten, und eine fehlerhafte
+Antwort – kein JSON, die falsche Form, ein unbekannter Zeichensatz), `http` (die
+Verbindung, die Warnung vor unverschlüsseltem `http:`) und `output` (ein fehlgeschlagenes
+Schreiben auf stdout). Ein Eintrag ist immer eine Zeile; Steuerzeichen darin werden
+maskiert.
+
 ---
 
 > **Bibliothek & Interna.** Begriffe zum TypeScript-Client und seinen Interna –

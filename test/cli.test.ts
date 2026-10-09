@@ -153,7 +153,7 @@ test("a malformed JSON response maps to exit code 1", async () => {
   }));
   const code = await run(["timestamps", "410", "DE", "hour"], cli.deps);
   assert.equal(code, 1);
-  assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.cli\] /);
+  assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] /);
 });
 
 test("global options propagate into the client via toEngineOptions", async () => {
@@ -321,7 +321,7 @@ test("a malformed data file exits 1 with a parse error, never printed as a resul
       const code = await run(["--compact", ...argv], cli.deps);
       assert.equal(code, 1, `${argv[0]} ${JSON.stringify(body)}`);
       assert.deepEqual(cli.out, [], `${argv[0]} ${JSON.stringify(body)}`);
-      assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.cli\] (Unexpected response shape|Malformed data file) from \/app\/chart_data\//);
+      assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] (Unexpected response shape|Malformed data file) from \/app\/chart_data\//);
     }
   }
 });
@@ -342,7 +342,7 @@ test("a malformed table_data file exits 1 with a parse error", async () => {
     const code = await run(["--compact", "table", "835", "DE", "1000"], cli.deps);
     assert.equal(code, 1, JSON.stringify(body));
     assert.deepEqual(cli.out, []);
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.cli\] (Unexpected response shape|Malformed table_data file) from \/app\/table_data\//);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] (Unexpected response shape|Malformed table_data file) from \/app\/table_data\//);
   }
   // The live shape, extra keys included, passes unchanged.
   const live = {
@@ -363,7 +363,7 @@ test("a negative timestamp in the index is the server's malformed index, never t
     const code = await run(argv, cli.deps);
     assert.equal(code, 1, argv[0]);
     assert.deepEqual(cli.out, []);
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.cli\] Malformed index from \/app\/chart_data\/817\/DE\/index_hour\.json: "timestamps" contains an element that is not a non-negative integer\.$/);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] Malformed index from \/app\/chart_data\/817\/DE\/index_hour\.json: "timestamps" contains an element that is not a non-negative integer\.$/);
     assert.doesNotMatch(cli.err.join("\n"), /Invalid timestamp/);
     assert.equal(cli.mt.calls.length, 1, "no data file is requested");
   }
@@ -455,5 +455,20 @@ test("a parse error is logged in the format commander would have parsed (L6)", a
     const cli = makeCli(() => jsonResponse({ timestamps: [1] }));
     assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
     assert.ok(cli.err.length > 0 && cli.err.every((line) => isJsonl(line) === jsonl), `${argv.join(" ")}:\n${cli.err.join("\n")}`);
+  }
+});
+
+test("a malformed answer is an ERROR record of smard.api, exit 1 (L9)", async () => {
+  const cases: [string[], HttpResponse][] = [
+    [["series", "410", "DE", "hour", "1"], jsonResponse({ meta_data: {}, series: [["1", 2]] })],
+    [["series", "410", "DE", "hour", "1"], jsonResponse({ error: "maintenance", series: null })],
+    [["table", "410", "DE", "1"], jsonResponse({ meta_data: {}, series: [{ values: [{ timestamp: 1, versions: [{ value: "x" }] }] }] })],
+    [["latest", "410", "DE", "hour"], jsonResponse({ timestamps: [-5] })],
+    [["timestamps", "410", "DE", "hour"], { status: 200, headers: { "content-type": "application/json; charset=x-nonsense" }, body: Buffer.from("{}") }],
+  ];
+  for (const [argv, answer] of cases) {
+    const cli = makeCli(() => answer);
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] /, argv.join(" "));
   }
 });

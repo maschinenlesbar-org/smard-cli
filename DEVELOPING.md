@@ -355,8 +355,9 @@ forge another one or steer the terminal. Before that a lone surrogate (half a
 character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
-library's validation and parse errors), `api` (the API's answers: an HTTP error status)
-`http` (the connection, the cleartext warning) and `output` (a failed write to stdout;
+library's validation errors), `api` (the API's answers: an HTTP error status, and a
+malformed answer — a `SmardParseError`: bad JSON, an unknown charset, a 2xx body without
+the documented shape, an index element that is no timestamp), `http` (the connection, the cleartext warning) and `output` (a failed write to stdout;
 smard writes no files, so there is no `-o`). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it
 (`logFormatFromArgv`, which skips the value of the program's value options such as

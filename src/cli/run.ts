@@ -10,6 +10,7 @@ import {
   SmardApiError,
   SmardError,
   SmardNetworkError,
+  SmardParseError,
   SmardValidationError,
   credentialsIn,
   echoedCredentialForms,
@@ -183,6 +184,18 @@ export function withRedactedOutput(deps: CliDeps, argv: readonly string[]): CliD
 }
 
 /**
+ * The log area of a `SmardError` that is neither an API error nor a usage error: the
+ * connection (`http`), a malformed answer (`api`: bad JSON, an unknown charset, a 2xx body
+ * without the documented shape — the API's answer as much as an error status is), else
+ * `cli`.
+ */
+function areaOf(err: SmardError): string {
+  if (err instanceof SmardNetworkError) return "http";
+  if (err instanceof SmardParseError) return "api";
+  return "cli";
+}
+
+/**
  * The log for what happens outside `run()`, in the bin shim: a stdout write error
  * (`handleOutputErrors`). Its format is the one argv asks for (`logFormatFromArgv`), and
  * it replaces the secrets of argv like the run's own log; it writes to the raw stderr.
@@ -264,7 +277,7 @@ export async function run(argv: string[], deps: CliDeps = defaultDeps): Promise<
       // Network errors, timeouts and parse errors (all SmardError subclasses)
       // deliberately collapse to exit code 1 — only 404 (above) gets a distinct
       // code. See the README "Exit codes" note.
-      log.error(err instanceof SmardNetworkError ? "http" : "cli", err.message);
+      log.error(areaOf(err), err.message);
       return 1;
     }
     log.error("cli", `Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
