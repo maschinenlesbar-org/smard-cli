@@ -374,7 +374,10 @@ touched, and a secret is kept out of the log in either format. `CliDeps.now` mak
 carries data only. A failed write to stdout other than a closed pipe
 (`handleOutputErrors`, in the bin shim, outside `run()`) is an ERROR record of
 `smard.output` (`Could not write to stdout: …`), in the format argv asks for and redacted
-like the run's log (`processLogger`). Conformance test P23 checks all
+like the run's log (`processLogger`). So are Node's own process warnings
+(`installWarningLog`, also installed by the shim): a WARN record of `smard.cli`,
+`(node) <name>: <message>`, instead of Node's plain `(node:PID) Warning: …` line (e.g.
+with `NODE_TLS_REJECT_UNAUTHORIZED=0`). Conformance test P23 checks all
 of this, and its body is shared across the *-cli repos.
 
 ## Testing
@@ -392,7 +395,8 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`io.test.ts`** — `handleOutputErrors` on fake streams: the pipe cases, and a stdout
   write error as an ERROR record of `smard.output`.
 - **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
-  (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
+  (`escapeForRecord`, `formatLogRecord`, `installWarningLog`); the CLI-level checks are
+  P23's.
 - **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan of
   2026-10-06; only the adapter block at the top differs per repo): P1 CLI output redaction,
   P2 library redaction, P4/P19 base-URL validation (the P19 case is skipped: smard reads no
