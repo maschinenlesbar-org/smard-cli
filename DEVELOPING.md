@@ -277,7 +277,12 @@ The base URL lives in a real `#private` field of the engine, so `console.log`,
 `util.inspect` and `JSON.stringify` of a client never show its password, and the
 engine scrubs the base URL's userinfo (raw and percent-decoded) from error bodies,
 details, transport error text and the `cause` chain
-(`test/conformance-p2-library-redaction.test.ts`).
+(`test/conformance-p2-library-redaction.test.ts`) — and with it the forms a server
+echoes it back in (`echoedCredentialForms`, exported): the `Authorization: Basic` value,
+the decoded `user:password`, and the password alone from 4 characters on
+(`redactSecrets`, exported). The CLI replaces the Basic value and the pair on stdout and
+stderr, the bare password on stderr only (on stdout a short password may well occur in
+the data).
 
 **Error classes and messages.** Every rejected input is a `SmardValidationError`,
 never a raw `TypeError`: a non-function `transport` or `sleep` fails in the

@@ -32,6 +32,8 @@ export {
   redactUrl,
   credentialsIn,
   redactCredentials,
+  echoedCredentialForms,
+  redactSecrets,
   cutForMessage,
   cutText,
   toWellFormed,
