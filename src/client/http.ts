@@ -8,7 +8,7 @@
 
 import http from "node:http";
 import https from "node:https";
-import { redactUrl, SmardNetworkError, SmardResponseTooLargeError } from "./errors.js";
+import { cutForMessage, redactUrl, SmardNetworkError, SmardResponseTooLargeError } from "./errors.js";
 
 export interface HttpRequest {
   method: string;
@@ -59,7 +59,7 @@ export const nodeHttpTransport: Transport = (request) =>
     try {
       url = new URL(request.url);
     } catch {
-      reject(new SmardNetworkError(`Invalid URL: ${redactUrl(request.url)}`));
+      reject(new SmardNetworkError(`Invalid URL: ${cutForMessage(redactUrl(request.url))}`));
       return;
     }
 
@@ -67,7 +67,7 @@ export const nodeHttpTransport: Transport = (request) =>
     // typed error instead of letting Node throw an opaque ERR_INVALID_PROTOCOL
     // (and so this never reaches the file:/ftp:/etc. drivers).
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      reject(new SmardNetworkError(`Unsupported protocol "${url.protocol}" in URL: ${redactUrl(request.url)}`));
+      reject(new SmardNetworkError(`Unsupported protocol "${url.protocol}" in URL: ${cutForMessage(redactUrl(request.url))}`));
       return;
     }
 

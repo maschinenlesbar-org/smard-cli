@@ -279,7 +279,8 @@ details, transport error text and the `cause` chain
 **Error classes and messages.** Every rejected input is a `SmardValidationError`,
 never a raw `TypeError`: a non-function `transport` or `sleep` fails in the
 constructor, `null` options count as none, a `.`/`..` path segment in direct engine
-use is a validation error too. Echoed values and server text (an API `detail`) are
+use is a validation error too. Echoed values, server text (an API `detail`) and the URL a
+message names (the request URL, the default transport's refused URL) are
 cut at `MAX_MESSAGE_VALUE_LENGTH` (500) characters with `cutForMessage`, never inside a
 surrogate pair (`cutText`), so the message stays well-formed; `SmardApiError.body` keeps
 the full text.
@@ -341,8 +342,9 @@ the message (text) or the whole JSON object (jsonl), which writes CR and LF as `
 every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
 controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
 forge another one or steer the terminal. Before that a lone surrogate (half a
-character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`).
-The areas are `cli` (usage errors, commander's messages, unexpected errors, the
+character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`),
+and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
+code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 library's validation and parse errors), `api` (the API's answers: an HTTP error status)
 and `http` (the connection, the cleartext warning); smard writes no files, so it has no
 `output` area. Code logs through `logOf(deps)` and never writes diagnostics with `io.err`

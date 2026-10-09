@@ -96,3 +96,15 @@ test("enforces maxResponseBytes", async () => {
     },
   );
 });
+
+test("the URL a refused request names is cut at MAX_MESSAGE_VALUE_LENGTH", async () => {
+  const long = "x".repeat(5000);
+  for (const url of [`not a url ${long}`, `ftp://mirror.test/${long}`]) {
+    await assert.rejects(nodeHttpTransport({ method: "GET", url }), (err: Error) => {
+      assert.ok(err instanceof SmardNetworkError);
+      assert.ok(err.message.length < 600, `${err.message.length}`);
+      assert.match(err.message, /x…$/);
+      return true;
+    });
+  }
+});
