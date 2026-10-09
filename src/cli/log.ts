@@ -7,7 +7,7 @@
 //
 // The text form follows log4j's pattern (`%d %-5p [%c] %m`), with the time in UTC
 // ISO 8601. The topic is a dotted logger name: the program, then the area the record
-// comes from (`smard.cli`, `smard.api`, `smard.http`, …). stdout carries data
+// comes from (`smard.cli`, `smard.api`, `smard.http`, `smard.output`). stdout carries data
 // only and is not touched; nor is `--help`/`--version`.
 
 import { cutText, toWellFormed } from "../client/errors.js";

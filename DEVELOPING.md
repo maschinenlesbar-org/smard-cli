@@ -204,8 +204,8 @@ errors. Sits between the client and the transport.
 
 **Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before
 `run()`: an EPIPE on stdout (`| head`) exits 0 quietly, an EPIPE on stderr is
-ignored so a failed run keeps its exit code, and any other stdout error prints one
-`Output error:` line and exits 1. `test/conformance-p7-pipes-exit-codes.test.ts`
+ignored so a failed run keeps its exit code, and any other stdout error is an ERROR
+record of `smard.output` (`Could not write to stdout: …`) and exits 1. `test/conformance-p7-pipes-exit-codes.test.ts`
 runs the built bin to check it.
 
 **CliDeps / CliIO.** The dependency-injection seam for the CLI
@@ -356,8 +356,8 @@ character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellF
 and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cut at a
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 library's validation and parse errors), `api` (the API's answers: an HTTP error status)
-and `http` (the connection, the cleartext warning); smard writes no files, so it has no
-`output` area. Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
+`http` (the connection, the cleartext warning) and `output` (a failed write to stdout;
+smard writes no files, so there is no `-o`). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it
 (`logFormatFromArgv`, which skips the value of the program's value options such as
 `--user-agent` and takes the first `--log-format`, as `once()` does; used only for the
@@ -370,8 +370,10 @@ help, so every failed run has an ERROR record (`writeCommanderErr`). The log is 
 with the run's redaction (`withRedactedOutput`),
 which replaces a secret in the message only, before it is escaped: the frame is never
 touched, and a secret is kept out of the log in either format. `CliDeps.now` makes the timestamps testable. stdout
-carries data only. Only the bin shim's `Output error: …` (a failed write to stdout,
-`handleOutputErrors`, outside `run()`) stays a plain line. Conformance test P23 checks all
+carries data only. A failed write to stdout other than a closed pipe
+(`handleOutputErrors`, in the bin shim, outside `run()`) is an ERROR record of
+`smard.output` (`Could not write to stdout: …`), in the format argv asks for and redacted
+like the run's log (`processLogger`). Conformance test P23 checks all
 of this, and its body is shared across the *-cli repos.
 
 ## Testing
@@ -386,6 +388,8 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`client.test.ts`** — every method's URL mapping, including the `latest` index→data flow — mocked transport.
 - **`cli.test.ts`** — end-to-end command parsing, validation and exit codes — mocked client.
 - **`validate.test.ts`** — `assertValid`, the `SmardValidationError` exit-code mapping and the `parity()` helper.
+- **`io.test.ts`** — `handleOutputErrors` on fake streams: the pipe cases, and a stdout
+  write error as an ERROR record of `smard.output`.
 - **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
 - **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan of
