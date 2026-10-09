@@ -5,7 +5,7 @@ import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
 import { assertArgument, headerValueProblem, nonNegativeIntegerProblem } from "../client/validate.js";
-import { DEFAULT_BASE_URL, baseUrlProblem, cleartextProblem, type EngineOptions } from "../client/engine.js";
+import { DEFAULT_BASE_URL, baseUrlProblem, cleartextProblem, type EngineOptions, type RetryEvent } from "../client/engine.js";
 
 /**
  * Parse a plain non-negative decimal integer string. Validates the *raw string*
@@ -150,6 +150,19 @@ export function renderJson(deps: CliDeps, global: GlobalOptions, value: unknown)
   deps.io.out(text);
 }
 
+/** `HTTP 503 from host: retry 1 of 3 in 2 s` (host only; whole seconds, ms under 1 s). */
+export function retryMessage(event: RetryEvent): string {
+  let host: string;
+  try {
+    host = new URL(event.url).host;
+  } catch {
+    host = "the server";
+  }
+  const why = event.status === undefined ? "connection reset" : `HTTP ${event.status}`;
+  const wait = event.delayMs < 1000 ? `${event.delayMs} ms` : `${Math.round(event.delayMs / 1000)} s`;
+  return `${why} from ${host}: retry ${event.retry} of ${event.maxRetries} in ${wait}`;
+}
+
 export interface ActionContext {
   client: ReturnType<CliDeps["createClient"]>;
   global: GlobalOptions;
@@ -203,7 +216,9 @@ export function action<A = string[]>(
     const parsed = options.parse === undefined ? (positionals as unknown as A) : options.parse(positionals);
     const cleartext = options.makesRequests === false ? undefined : cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL);
     if (cleartext !== undefined) logOf(deps).warn("http", cleartext);
-    const client = deps.createClient(toEngineOptions(global));
+    const engineOptions = toEngineOptions(global);
+    engineOptions.onRetry = (event) => logOf(deps).warn("http", retryMessage(event));
+    const client = deps.createClient(engineOptions);
     await fn({ client, global, opts: command.opts() }, parsed);
   };
 }

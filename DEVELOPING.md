@@ -235,6 +235,13 @@ not retried" and carries `retryAfterMs`. After spent retries the message ends
 `SmardApiError.isRetryable` flags these statuses
 (`test/conformance-p6-retry-policy.test.ts`).
 
+Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
+`{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
+redacted) `}`) is called once per retry right before the sleep, never when there is none, and
+a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
+`smard.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
+seconds, ms under 1 s). Tests: `test/retry-log.test.ts`.
+
 **maxResponseBytes.** A hard cap (default 100 MiB; `0` = unlimited) on response
 body size, defending against memory exhaustion; a breach aborts the request with
 `SmardResponseTooLargeError`, whose message names `maxResponseBytes` and

@@ -218,7 +218,7 @@ valid resolution values — served locally from the bundled enums, no network ca
 `--log-format jsonl` as one JSON object per line. The areas: `cli` (usage errors,
 commander's messages, unexpected errors), `api` (the API's answers: an error status such
 as the `404` for a window without data, and a malformed answer — not JSON, the wrong
-shape, an unknown charset), `http` (the connection, the cleartext warning) and `output`
+shape, an unknown charset), `http` (the connection, the cleartext warning, and one WARN per retry before it waits) and `output`
 (a failed write to stdout). A record is always one line; control characters in it are
 escaped.
 
