@@ -280,8 +280,9 @@ details, transport error text and the `cause` chain
 never a raw `TypeError`: a non-function `transport` or `sleep` fails in the
 constructor, `null` options count as none, a `.`/`..` path segment in direct engine
 use is a validation error too. Echoed values and server text (an API `detail`) are
-cut at `MAX_MESSAGE_VALUE_LENGTH` (500) characters with `cutForMessage`;
-`SmardApiError.body` keeps the full text.
+cut at `MAX_MESSAGE_VALUE_LENGTH` (500) characters with `cutForMessage`, never inside a
+surrogate pair (`cutText`), so the message stays well-formed; `SmardApiError.body` keeps
+the full text.
 `test/conformance-p8-p9-p13-responses-and-errors.test.ts` holds the shared checks
 for the declared charset (P8), 2xx bodies without the documented shape (P9) and
 wrong-typed input (P13).
@@ -339,7 +340,9 @@ and `msg`. A record is always one line: `formatLogRecord` runs `escapeForRecord`
 the message (text) or the whole JSON object (jsonl), which writes CR and LF as `\r`/`\n`,
 every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
 controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
-forge another one or steer the terminal. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
+forge another one or steer the terminal. Before that a lone surrogate (half a
+character, which jq rejects, stopping the whole stream) becomes U+FFFD (`toWellFormed`).
+The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 library's validation and parse errors), `api` (the API's answers: an HTTP error status)
 and `http` (the connection, the cleartext warning); smard writes no files, so it has no
 `output` area. Code logs through `logOf(deps)` and never writes diagnostics with `io.err`

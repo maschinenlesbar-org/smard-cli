@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/client/engine.js";
-import { SmardApiError, SmardError, SmardParseError, SmardValidationError } from "../src/client/errors.js";
+import { SmardApiError, SmardError, SmardParseError, SmardValidationError, cutText, toWellFormed } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 
 // Control characters built via char codes so no raw control bytes ever appear in
@@ -211,4 +211,30 @@ test("the User-Agent and Accept headers are sent", async () => {
   await e.getJson("/x");
   assert.equal(mt.last().headers?.["User-Agent"], "ua/1");
   assert.equal(mt.last().headers?.["Accept"], "application/json");
+});
+
+test("cutText never cuts inside a surrogate pair; toWellFormed replaces half a character", () => {
+  assert.equal(cutText("ab\u{1f600}cd", 3), "ab");
+  assert.equal(cutText("ab\u{1f600}cd", 4), "ab\u{1f600}");
+  assert.equal(cutText("short", 10), "short");
+  assert.equal(toWellFormed("a\ud83d b\ude00 \u{1f600}"), "a\ufffd b\ufffd \u{1f600}");
+});
+
+test("a server detail and a charset label cut to their limits keep the message well-formed", async () => {
+  for (const detail of ["\u{1f600}".repeat(400), "a" + "\u{1f600}".repeat(400)]) {
+    const engine = new RequestEngine({ transport: async () => jsonResponse({ detail }, 500) });
+    await assert.rejects(engine.getJson("/app/x.json"), (err: Error) => {
+      assert.equal(toWellFormed(err.message), err.message);
+      assert.match(err.message, /…/);
+      return true;
+    });
+  }
+  // A custom transport can hand over any header text: a label of 99 units and an emoji.
+  const label = "a".repeat(99) + "\u{1f600}";
+  const engine = new RequestEngine({ transport: async () => rawResponse("{}", `application/json; charset=${label}`) });
+  await assert.rejects(engine.getJson("/app/x.json"), (err: Error) => {
+    assert.ok(err instanceof SmardParseError);
+    assert.equal(toWellFormed(err.message), err.message);
+    return true;
+  });
 });

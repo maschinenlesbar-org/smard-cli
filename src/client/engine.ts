@@ -21,6 +21,7 @@ import {
   SmardValidationError,
   credentialsIn,
   cutForMessage,
+  cutText,
   redactCredentials,
 } from "./errors.js";
 import { assertHeaderValue, assertValid, intRangeProblem, nonNegativeIntegerProblem } from "./validate.js";
@@ -609,7 +610,7 @@ function decodeBody(body: Buffer, contentType: string, path: string): string {
   try {
     decoder = new TextDecoder(charset);
   } catch {
-    throw new SmardParseError(`Unsupported response charset "${sanitizeServerText(charset).slice(0, 100)}" from ${path}.`);
+    throw new SmardParseError(`Unsupported response charset "${cutText(sanitizeServerText(charset), 100)}" from ${path}.`);
   }
   return decoder.decode(body);
 }
