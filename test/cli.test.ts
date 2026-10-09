@@ -413,3 +413,28 @@ test("an a:b@c argument (a region, a User-Agent) is neither a credential in the 
   assert.equal(await run(["--base-url", "alice:hunter2-pw@mirror.example", "timestamps", "410", "DE", "hour"], bare.deps), 1);
   assert.ok(!bare.err.join("\n").includes("hunter2-pw"), bare.err.join("\n"));
 });
+
+test("the help after a usage error is one INFO record per line; a suggestion is part of the ERROR (L5)", async () => {
+  const cli = makeCli(() => jsonResponse({ timestamps: [1] }));
+  assert.equal(await run(["timestamps", "410", "DE", "hour", "--no-such-option"], cli.deps), 1);
+  const records = cli.err.map(untimed);
+  assert.equal(records[0], "ERROR [smard.cli] unknown option '--no-such-option'");
+  assert.ok(records.length > 3, records.join("\n"));
+  for (const record of records.slice(1)) {
+    assert.match(record, /^INFO  \[smard\.cli\] .*\S$/);
+    assert.doesNotMatch(record, /\\n/, "one line of the help per record");
+  }
+  const typo = makeCli(() => jsonResponse({}));
+  assert.equal(await run(["seriesx"], typo.deps), 1);
+  assert.equal(untimed(typo.err[0] ?? ""), "ERROR [smard.cli] unknown command 'seriesx' (Did you mean series?)");
+});
+
+test("help for an unknown command is a failed run with an ERROR first, then the help one INFO record per line (L5)", async () => {
+  const cli = makeCli(() => jsonResponse({}));
+  assert.equal(await run(["help", "bogus"], cli.deps), 1);
+  const records = cli.err.map(untimed);
+  assert.equal(records[0], "ERROR [smard.cli] missing command: `smard <subcommand>`");
+  assert.ok(records.length > 3, records.join("\n"));
+  for (const record of records.slice(1)) assert.match(record, /^INFO  \[smard\.cli\] .*\S$/);
+  assert.ok(records.some((record) => /\] Usage: smard /.test(record)), records.join("\n"));
+});
