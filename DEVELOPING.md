@@ -335,7 +335,11 @@ Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp,
 (`ERROR`, `WARN`, `INFO`) and a topic, `smard.<area>`. `--log-format text` (the default)
 writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
 `--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
-and `msg`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
+and `msg`. A record is always one line: `formatLogRecord` runs `escapeForRecord` over
+the message (text) or the whole JSON object (jsonl), which writes CR and LF as `\r`/`\n`,
+every other C0 control but TAB, DEL and C1 as `\u00XX`, and U+2028, U+2029 and the bidi
+controls as `\uXXXX`, so no text that reaches a record, by whatever path, can split it,
+forge another one or steer the terminal. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 library's validation and parse errors), `api` (the API's answers: an HTTP error status)
 and `http` (the connection, the cleartext warning); smard writes no files, so it has no
 `output` area. Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
@@ -358,6 +362,8 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`client.test.ts`** — every method's URL mapping, including the `latest` index→data flow — mocked transport.
 - **`cli.test.ts`** — end-to-end command parsing, validation and exit codes — mocked client.
 - **`validate.test.ts`** — `assertValid`, the `SmardValidationError` exit-code mapping and the `parity()` helper.
+- **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
+  (`escapeForRecord`, `formatLogRecord`); the CLI-level checks are P23's.
 - **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan of
   2026-10-06; only the adapter block at the top differs per repo): P1 CLI output redaction,
   P2 library redaction, P4/P19 base-URL validation (the P19 case is skipped: smard reads no

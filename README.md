@@ -130,7 +130,11 @@ stdout into `jq` stays clean.
 Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
 `INFO`) and a topic, the program and the area it comes from (`smard.cli` for usage
 errors, `smard.api` for the API's answers, `smard.http` for the connection). By default
-it is written log4j style; `--log-format jsonl` writes one JSON object per line instead:
+it is written log4j style; `--log-format jsonl` writes one JSON object per line instead.
+A record is always one line: a line break, a control character or a bidi control in a
+message (a server's text, a value you typed) is written as an escape (`\n`, `\u001b`,
+`\u202e`), so it can neither split a record nor forge another one, nor steer the
+terminal:
 
 ```text
 2026-10-09T14:03:12.481Z WARN  [smard.http] requests to mirror.test are sent unencrypted (http:, not https:)
