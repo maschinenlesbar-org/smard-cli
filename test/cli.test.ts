@@ -488,3 +488,24 @@ test("a --base-url with an inner line break or control character is a usage erro
     assert.equal(cli.err.filter((line) => line.includes("forged")).length, base.includes("forged") ? 1 : 0);
   }
 });
+
+test("a usage error found before any request logs no cleartext WARN (03-1)", async () => {
+  const cases = [
+    ["series", "x", "DE", "hour", "1"],
+    ["timestamps", "410", "XX", "hour"],
+    ["table", "410", "DE", "-1"],
+    ["latest", "410", "DE", "fortnight"],
+  ];
+  for (const argv of cases) {
+    const cli = makeCli(() => jsonResponse({ timestamps: [1] }));
+    assert.equal(await run(["--base-url", "http://mirror.example", ...argv], cli.deps), 1, argv.join(" "));
+    assert.equal(cli.mt.calls.length, 0, argv.join(" "));
+    assert.ok(!cli.err.some((line) => line.includes("[smard.http]")), `${argv.join(" ")}:\n${cli.err.join("\n")}`);
+    assert.equal(cli.err.length, 1, cli.err.join("\n"));
+    assert.match(untimed(cli.err[0] ?? ""), /^ERROR \[smard\.cli\] Invalid /, argv.join(" "));
+  }
+  // A run that does send a request still warns, once, before it.
+  const sent = makeCli(() => jsonResponse({ timestamps: [1] }));
+  assert.equal(await run(["--base-url", "http://mirror.example", "timestamps", "410", "DE", "hour"], sent.deps), 0);
+  assert.equal(sent.err.filter((line) => line.includes("WARN  [smard.http]")).length, 1, sent.err.join("\n"));
+});

@@ -157,33 +157,53 @@ export interface ActionContext {
   opts: Record<string, unknown>;
 }
 
+/** How `action()` runs a command. */
+export interface ActionOptions<A> {
+  /**
+   * Whether the command contacts the API (default `true`): only then is the base URL
+   * checked for plain `http:`. The catalogue commands answer from built-in lists.
+   */
+  makesRequests?: boolean;
+  /**
+   * Turns the positional arguments into what the command works with, with the library's
+   * checks (a `SmardValidationError` for a bad one). It runs before the cleartext warning
+   * and before the client is built, so a usage error is never preceded by that warning.
+   * Without it the command gets the positionals as strings.
+   */
+  parse?: (positionals: string[]) => A;
+}
+
 /**
  * Wrap an async command action with consistent global-option resolution and
  * client construction. The callback receives a context (client + resolved global
- * options + this command's options) and the command's positional arguments.
+ * options + this command's options) and the command's arguments: what `parse` made of
+ * the positionals, or the positionals themselves.
  *
- * Before the client is built (so before any request), a command that contacts the API
+ * `parse` runs first, so a bad argument is a usage error before anything else. Then,
+ * before the client is built (so before any request), a command that contacts the API
  * (`makesRequests`, the default) checks the base URL: plain `http:` to a remote host gets
  * one WARN record of `smard.http` (the `cleartextProblem` sentence) on stderr. The
- * catalogue commands answer from built-in lists and pass `false`. An action runs once per run, so the warning does
- * too; help, version and usage errors never reach an action and never warn. stdout is
+ * catalogue commands answer from built-in lists and pass `makesRequests: false`. An
+ * action runs once per run, so the warning does too; help, version and usage errors —
+ * commander's and those `parse` finds — never get that far and never warn. stdout is
  * never touched.
  *
  * Commander invokes actions as (arg1, ..., argN, options, command); we slice off
  * the trailing options object and command instance to recover the positionals.
  */
-export function action(
+export function action<A = string[]>(
   deps: CliDeps,
-  fn: (ctx: ActionContext, positionals: string[]) => Promise<void>,
-  makesRequests = true,
+  fn: (ctx: ActionContext, args: A) => Promise<void>,
+  options: ActionOptions<A> = {},
 ): (...args: unknown[]) => Promise<void> {
   return async (...args: unknown[]) => {
     const command = args[args.length - 1] as Command;
     const positionals = args.slice(0, Math.max(0, args.length - 2)) as string[];
     const global = command.optsWithGlobals() as GlobalOptions;
-    const cleartext = makesRequests ? cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL) : undefined;
+    const parsed = options.parse === undefined ? (positionals as unknown as A) : options.parse(positionals);
+    const cleartext = options.makesRequests === false ? undefined : cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL);
     if (cleartext !== undefined) logOf(deps).warn("http", cleartext);
     const client = deps.createClient(toEngineOptions(global));
-    await fn({ client, global, opts: command.opts() }, positionals);
+    await fn({ client, global, opts: command.opts() }, parsed);
   };
 }

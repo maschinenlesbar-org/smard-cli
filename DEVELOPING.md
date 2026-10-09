@@ -177,8 +177,10 @@ src/
   `undefined` for `https:`, an unparseable URL and loopback hosts. `<host>` is `url.host`,
   never the userinfo. The `action()` wrapper logs it as a `WARN` record of `smard.http`
   on stderr once per run, before the client is built, for every command that contacts the API (the
-  offline `filters`/`regions`/`resolutions` pass `makesRequests: false`); help, version
-  and usage errors never warn, stdout and the exit code are unchanged, and the library
+  offline `filters`/`regions`/`resolutions` pass `makesRequests: false`), and after the
+  command's positional arguments are parsed with the library's checks (`parse`), so
+  help, version and usage errors — commander's and a bad filter, region, resolution or
+  timestamp — never warn, stdout and the exit code are unchanged, and the library
   never warns. `test/conformance-p20-cleartext-warning.test.ts` is the shared check (P20).
 - **README links (P21).** README.md ships in the npm tarball and is shown on npmjs.com,
   so a relative link in it must point to a file the package ships (`files` in
