@@ -383,3 +383,16 @@ test("the catalogue commands make no request and never warn about a plain-http: 
     assert.deepEqual(err, []);
   }
 });
+
+test("a rejected --base-url whose password holds a space and DEL, C1 or bidi is redacted in jsonl too (#6)", async () => {
+  for (const pw of ["top secret\u007fx", "top secret\u0085x", "top secret‮x"]) {
+    for (const format of ["text", "jsonl"]) {
+      const cli = makeCli(() => jsonResponse({}));
+      const code = await run(["--log-format", format, "--base-url", `http://alice:${pw}@127.0.0.1:1/?x=1`, "timestamps", "410", "DE", "hour"], cli.deps);
+      assert.equal(code, 1);
+      const all = cli.err.join("\n");
+      assert.match(all, /\*\*\*@127\.0\.0\.1/, `${format} ${JSON.stringify(pw)}: ${all}`);
+      assert.ok(!all.includes("secret"), `${format} ${JSON.stringify(pw)}: ${all}`);
+    }
+  }
+});

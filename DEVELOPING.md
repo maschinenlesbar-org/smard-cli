@@ -161,7 +161,10 @@ src/
   and every line printed on stdout or stderr has those strings replaced by `***`
   (`redactCredentials`), with a pattern-based backstop. A pattern alone can't
   delimit a password that holds a space, quote, `#`, `?` or `/`; the exact strings
-  can. `test/conformance-p1-cli-redaction.test.ts` checks ten such passwords in
+  can. The log replaces them in each record's *message* (`redactionFor`), before the
+  record is cut and escaped, and writes the record to the raw stderr: the frame (time,
+  level, topic) is never touched, and a password with DEL, C1 or bidi characters is
+  matched in its raw form. `test/conformance-p1-cli-redaction.test.ts` checks ten such passwords in
   seven URL shapes on every echo path.
 - **Plain `http:` warning (CLI).** `cleartextProblem(baseUrl, secrets?)` (`engine.ts`,
   exported) returns one sentence when requests to `baseUrl` would travel unencrypted —
@@ -349,8 +352,9 @@ library's validation and parse errors), `api` (the API's answers: an HTTP error 
 and `http` (the connection, the cleartext warning); smard writes no files, so it has no
 `output` area. Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it, so commander's
-own usage errors are records too, and on top of the redacted `io.err`, so a secret is kept
-out of the log in either format. `CliDeps.now` makes the timestamps testable. stdout
+own usage errors are records too, and with the run's redaction (`withRedactedOutput`),
+which replaces a secret in the message only, before it is escaped: the frame is never
+touched, and a secret is kept out of the log in either format. `CliDeps.now` makes the timestamps testable. stdout
 carries data only. Only the bin shim's `Output error: …` (a failed write to stdout,
 `handleOutputErrors`, outside `run()`) stays a plain line. Conformance test P23 checks all
 of this, and its body is shared across the *-cli repos.
