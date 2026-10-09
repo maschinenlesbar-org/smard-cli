@@ -53,7 +53,7 @@ test("parity: filters --group gives the same result as filtersByGroup()", async 
       assert.deepEqual(JSON.parse(cli.out), l.value, group);
     } else {
       assert.equal(cli.code, 1, group);
-      assert.equal(cli.err, `Error: ${(l.error as Error).message}`, group);
+      assert.equal(cli.err, `ERROR [smard.cli] ${(l.error as Error).message}`, group);
     }
   }
 });

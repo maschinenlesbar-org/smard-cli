@@ -190,12 +190,13 @@ usage error:
 | Option | Description |
 | --- | --- |
 | `-V, --version` | print the version |
-| `--base-url <url>` | API base URL (default `https://www.smard.de`; no query `?`, fragment `#` or surrounding whitespace; a literal `%` in the userinfo is written `%25`; userinfo is shown as `***` in everything the CLI prints, a rejected value included). A plain `http:` base URL to a remote host prints one `warning: … sent unencrypted to <host> (http:, not https:)` line on stderr before the first request (naming the base URL's credentials when it carries any, never printing them); loopback hosts (`localhost`, `127.x`, `::1`) and the offline catalogue commands don't warn, and stdout and the exit code are unchanged |
+| `--base-url <url>` | API base URL (default `https://www.smard.de`; no query `?`, fragment `#` or surrounding whitespace; a literal `%` in the userinfo is written `%25`; userinfo is shown as `***` in everything the CLI prints, a rejected value included). A plain `http:` base URL to a remote host logs one `WARN` record of `smard.http` on stderr (`… sent unencrypted to <host> (http:, not https:)`) before the first request (naming the base URL's credentials when it carries any, never printing them); loopback hosts (`localhost`, `127.x`, `::1`) and the offline catalogue commands don't warn, and stdout and the exit code are unchanged |
 | `--timeout <ms>` | time limit per request in ms, whole response included (`0` = no timeout; default `30000`; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value (non-blank; no control characters or characters above U+00FF — a usage error before any request) |
 | `--max-retries <n>` | retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`; each backs off linearly, or waits the server's `Retry-After` when longer, up to 30 s; a longer one is not retried) |
 | `--max-response-bytes <n>` | cap response body size in bytes (`0` = unlimited; default 100 MiB) |
 | `--compact` | print JSON on a single line instead of pretty-printed |
+| `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [smard.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
 | `-h, --help` | help for the program or a command (`smard <command> --help`) |
 
 Exit codes: `0` success, `4` on a `404` from the API, `1` for any other error

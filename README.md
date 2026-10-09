@@ -127,6 +127,20 @@ smard series 4169 DE-LU hour "$TS"
 Every command prints **pretty JSON to stdout**. Errors go to stderr, so piping
 stdout into `jq` stays clean.
 
+Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `WARN`,
+`INFO`) and a topic, the program and the area it comes from (`smard.cli` for usage
+errors, `smard.api` for the API's answers, `smard.http` for the connection). By default
+it is written log4j style; `--log-format jsonl` writes one JSON object per line instead:
+
+```text
+2026-10-09T14:03:12.481Z WARN  [smard.http] requests to mirror.test are sent unencrypted (http:, not https:)
+2026-10-09T14:03:12.902Z ERROR [smard.api] HTTP 404 for GET https://www.smard.de/app/chart_data/4169/DE/4169_DE_hour_1700000000000.json
+```
+
+```bash
+smard --log-format jsonl series 4169 DE hour 1700000000000 2>log.jsonl   # {"ts":"…","level":"ERROR","topic":"smard.api","msg":"HTTP 404 …"}
+```
+
 ```bash
 # Count data points in a series window
 smard --compact latest 4068 DE hour | jq '.series | length'
@@ -190,7 +204,8 @@ These apply to every command and may be given before *or* after it, each at most
 | `-V, --version` | Print the version number |
 | `-h, --help` | Show help for the program or a command |
 | `--compact` | Print JSON on a single line instead of pretty-printed |
-| `--base-url <url>` | API base URL (default `https://www.smard.de`; an `http:`/`https:` URL, optionally with a path prefix; a query `?`, fragment `#`, surrounding whitespace or a `%` in the userinfo that isn't an escape — write a literal `%` as `%25` — is a usage error). Userinfo (`https://user:pw@mirror`) is sent as Basic auth and shown as `***` in everything the CLI prints, a rejected `--base-url` included. A plain `http:` base URL to a remote host prints one `warning: … sent unencrypted to <host> (http:, not https:)` line on stderr before the first request (naming the base URL's credentials when it carries any, never printing them); loopback hosts (`localhost`, `127.x`, `::1`) and the offline catalogue commands don't warn, and stdout and the exit code are unchanged |
+| `--log-format <format>` | How errors, warnings and notes are written to stderr: `text` (default; log4j style, `2026-10-09T14:03:12.481Z WARN  [smard.http] …`) or `jsonl` (one JSON object per line: `ts`, `level`, `topic`, `msg`). stdout is not affected |
+| `--base-url <url>` | API base URL (default `https://www.smard.de`; an `http:`/`https:` URL, optionally with a path prefix; a query `?`, fragment `#`, surrounding whitespace or a `%` in the userinfo that isn't an escape — write a literal `%` as `%25` — is a usage error). Userinfo (`https://user:pw@mirror`) is sent as Basic auth and shown as `***` in everything the CLI prints, a rejected `--base-url` included. A plain `http:` base URL to a remote host logs one `WARN` record of `smard.http` on stderr (`… sent unencrypted to <host> (http:, not https:)`) before the first request (naming the base URL's credentials when it carries any, never printing them); loopback hosts (`localhost`, `127.x`, `::1`) and the offline catalogue commands don't warn, and stdout and the exit code are unchanged |
 | `--timeout <ms>` | Time limit per request in ms, reading the whole response included (`0` = no timeout; default `30000`; at most `2147483647`) |
 | `--user-agent <ua>` | `User-Agent` header value (non-blank; no control characters or characters above U+00FF — a usage error before any request) |
 | `--max-retries <n>` | Retries for transient `429`/`503` responses and reset connections (`0`–`10`, default `2`). Each retry backs off linearly (200 ms × attempt) or waits the server's `Retry-After` when that is longer (up to 30 s; a longer one is not retried, and the error names the wait) |

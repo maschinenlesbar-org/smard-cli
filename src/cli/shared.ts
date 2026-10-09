@@ -3,7 +3,7 @@
 
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
-import type { CliDeps } from "./io.js";
+import { logOf, type CliDeps } from "./io.js";
 import { assertArgument, headerValueProblem, nonNegativeIntegerProblem } from "../client/validate.js";
 import { DEFAULT_BASE_URL, baseUrlProblem, cleartextProblem, type EngineOptions } from "../client/engine.js";
 
@@ -164,8 +164,8 @@ export interface ActionContext {
  *
  * Before the client is built (so before any request), a command that contacts the API
  * (`makesRequests`, the default) checks the base URL: plain `http:` to a remote host gets
- * one `warning: <cleartextProblem sentence>` line on stderr. The catalogue commands answer
- * from built-in lists and pass `false`. An action runs once per run, so the warning does
+ * one WARN record of `smard.http` (the `cleartextProblem` sentence) on stderr. The
+ * catalogue commands answer from built-in lists and pass `false`. An action runs once per run, so the warning does
  * too; help, version and usage errors never reach an action and never warn. stdout is
  * never touched.
  *
@@ -182,7 +182,7 @@ export function action(
     const positionals = args.slice(0, Math.max(0, args.length - 2)) as string[];
     const global = command.optsWithGlobals() as GlobalOptions;
     const cleartext = makesRequests ? cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL) : undefined;
-    if (cleartext !== undefined) deps.io.err(`warning: ${cleartext}`);
+    if (cleartext !== undefined) logOf(deps).warn("http", cleartext);
     const client = deps.createClient(toEngineOptions(global));
     await fn({ client, global, opts: command.opts() }, positionals);
   };

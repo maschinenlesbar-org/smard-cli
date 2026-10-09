@@ -6,7 +6,7 @@ import { SmardError, SmardValidationError } from "../src/client/errors.js";
 import { SmardClient } from "../src/client/client.js";
 import { run } from "../src/cli/run.js";
 import type { CliDeps } from "../src/cli/io.js";
-import { parity, jsonResponse } from "./helpers.js";
+import { parity, jsonResponse, untimed } from "./helpers.js";
 
 const nonBlank: Problem<string> = (v) => (v.trim() === "" ? "Expected a non-empty value." : undefined);
 
@@ -30,7 +30,7 @@ test("the validation layer is exported from the package root", () => {
   assert.equal(lib.SmardValidationError, SmardValidationError);
 });
 
-test("run() maps a SmardValidationError raised in an action to the usage exit 1, 'Error: <message>'", async () => {
+test("run() maps a SmardValidationError raised in an action to the usage exit 1 and an ERROR record", async () => {
   const out: string[] = [];
   const err: string[] = [];
   const deps: CliDeps = {
@@ -40,7 +40,7 @@ test("run() maps a SmardValidationError raised in an action to the usage exit 1,
     },
   };
   assert.equal(await run(["timestamps", "410", "DE", "hour"], deps), 1);
-  assert.deepEqual(err, ["Error: Invalid thing: Expected a non-empty value."]);
+  assert.deepEqual(err.map(untimed), ["ERROR [smard.cli] Invalid thing: Expected a non-empty value."]);
   assert.deepEqual(out, []);
 });
 

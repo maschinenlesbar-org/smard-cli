@@ -11,7 +11,7 @@ import {
 } from "../src/client/validate.js";
 import * as lib from "../src/index.js";
 import { SmardValidationError } from "../src/client/errors.js";
-import { constantJson, jsonResponse, makeMockTransport, parity } from "./helpers.js";
+import { constantJson, jsonResponse, makeMockTransport, parity, untimed } from "./helpers.js";
 import { run } from "../src/cli/run.js";
 import type { HttpRequest } from "../src/client/http.js";
 
@@ -159,7 +159,7 @@ test("parity: bad chart arguments are rejected by the CLI and the library alike,
     assert.equal(l.ok, false, argv.join(" "));
     assert.ok(!l.ok && l.error instanceof SmardValidationError, argv.join(" "));
     assert.equal(l.requests.length, 0, argv.join(" "));
-    assert.equal(cli.err, `Error: ${(l as { error: Error }).error.message}`, argv.join(" "));
+    assert.equal(cli.err, `ERROR [smard.cli] ${(l as { error: Error }).error.message}`, argv.join(" "));
   }
 });
 
@@ -188,7 +188,7 @@ test("echoed values and server text are cut at 500 characters; null options mean
   });
   assert.equal(code, 1);
   assert.ok(cli.err.join("\n").length < 700, `${cli.err.join("\n").length} characters`);
-  assert.match(cli.err.join("\n"), /^Error: Invalid filter "9{500}…"\. Expected a non-negative integer\.$/);
+  assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.cli\] Invalid filter "9{500}…"\. Expected a non-negative integer\.$/);
   const detail = "boom ".repeat(10_000);
   const client = new SmardClient({ transport: makeMockTransport(() => jsonResponse({ detail }, 500)).transport, maxRetries: 0 });
   await assert.rejects(client.timestamps(410, "DE", "hour"), (e: unknown) => e instanceof Error && e.message.length < 700);

@@ -119,7 +119,8 @@ src/
     validate.ts  # input rules (Problem functions) + assertValid, shared with the CLI
     client.ts    # SmardClient — the chart-data surface over the engine
   cli/
-    io.ts        # injectable I/O seam (stdout/stderr/file)
+    io.ts        # injectable I/O seam (stdout/stderr/file), the logger and the clock
+    log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver, JSON renderer
     commands/    # chart (timestamps/series/latest/table) + catalogue commands
     program.ts   # assembles the commander program from injectable deps
@@ -167,8 +168,8 @@ src/
   `requests to <host> are sent unencrypted (http:, not https:)`, or `the base URL's
   credentials are sent unencrypted to <host> (http:, not https:)` with userinfo — and
   `undefined` for `https:`, an unparseable URL and loopback hosts. `<host>` is `url.host`,
-  never the userinfo. The `action()` wrapper writes `warning: <sentence>` to stderr once
-  per run, before the client is built, for every command that contacts the API (the
+  never the userinfo. The `action()` wrapper logs it as a `WARN` record of `smard.http`
+  on stderr once per run, before the client is built, for every command that contacts the API (the
   offline `filters`/`regions`/`resolutions` pass `makesRequests: false`); help, version
   and usage errors never warn, stdout and the exit code are unchanged, and the library
   never warns. `test/conformance-p20-cleartext-warning.test.ts` is the shared check (P20).
@@ -328,6 +329,23 @@ element into the path of a follow-up `series()` request, so a hostile or MITM'd
 origin's string element (e.g. `"1/../evil"`) is refused before it gets there
 (`series()` escapes every argument as well).
 
+## The log on stderr
+
+Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+(`ERROR`, `WARN`, `INFO`) and a topic, `smard.<area>`. `--log-format text` (the default)
+writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
+`--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
+and `msg`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
+library's validation and parse errors), `api` (the API's answers: an HTTP error status)
+and `http` (the connection, the cleartext warning); smard writes no files, so it has no
+`output` area. Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
+directly. `run()` builds the logger from argv before commander parses it, so commander's
+own usage errors are records too, and on top of the redacted `io.err`, so a secret is kept
+out of the log in either format. `CliDeps.now` makes the timestamps testable. stdout
+carries data only. Only the bin shim's `Output error: …` (a failed write to stdout,
+`handleOutputErrors`, outside `run()`) stays a plain line. Conformance test P23 checks all
+of this, and its body is shared across the *-cli repos.
+
 ## Testing
 
 ```bash
@@ -345,7 +363,8 @@ npm test          # builds, then runs `node --test` over dist/test
   P2 library redaction, P4/P19 base-URL validation (the P19 case is skipped: smard reads no
   environment variable), P5 the engine-enforced transport contract, P6 the retry policy, P7
   closed pipes (spawns the built bin), P8/P9/P13 charset, response shapes and validation
-  errors.
+  errors, P20 the stderr warning for a plain-`http:` base URL, P23 the log on stderr (its
+  body takes the usage-error exit code from the adapter's `USAGE_EXIT`, `1` here).
 
 ## Continuous integration
 
