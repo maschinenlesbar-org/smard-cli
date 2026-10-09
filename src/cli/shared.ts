@@ -81,7 +81,7 @@ export function parseHeaderValue(value: string): string {
 
 /**
  * commander value-parser for `--base-url`. The rules (absolute http(s) URL, no
- * query or fragment, no surrounding whitespace) are the library's
+ * query or fragment, no surrounding whitespace, no control character) are the library's
  * `baseUrlProblem`, which the engine enforces too; its reason becomes a usage
  * error here, at parse time, before any client is built.
  */

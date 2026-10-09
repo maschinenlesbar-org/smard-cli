@@ -472,3 +472,19 @@ test("a malformed answer is an ERROR record of smard.api, exit 1 (L9)", async ()
     assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] /, argv.join(" "));
   }
 });
+
+test("a --base-url with an inner line break or control character is a usage error: no request, one record (01-1)", async () => {
+  for (const base of [
+    "http://127.0.0.1:1/p\n2026-10-09T00:00:00.000Z\tINFO\t[smard.cli]\tforged",
+    "http://127.0.0.1:1/p\u001b]0;pwned\u0007\u001b[2J",
+    "http://127.0.0.1:1/p\rX",
+  ]) {
+    const cli = makeCli(() => jsonResponse({}, 404));
+    assert.equal(await run(["--base-url", base, "series", "410", "DE", "hour", "1"], cli.deps), 1);
+    assert.equal(cli.mt.calls.length, 0, JSON.stringify(base));
+    assert.equal(cli.err.length > 0 && untimed(cli.err[0] ?? "").startsWith("ERROR [smard.cli] option '--base-url <url>' argument"), true, cli.err.join("\n"));
+    assert.match(cli.err[0] ?? "", /cannot contain a control character/);
+    for (const line of cli.err) assert.doesNotMatch(line, /[\u0000-\u0008\u000a-\u001f\u007f-\u009f]/, line);
+    assert.equal(cli.err.filter((line) => line.includes("forged")).length, base.includes("forged") ? 1 : 0);
+  }
+});

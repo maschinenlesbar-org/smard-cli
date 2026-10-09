@@ -164,7 +164,11 @@ function sanitizeServerText(text: string): string {
  *   `http://h/?x=1` would request `/?x=1/app/...` and `http://h/#f` would request `/`);
  * - it has no surrounding whitespace (`new URL()` trims silently, but the engine
  *   appends request paths to the raw string, so a trailing space would request
- *   `/%20/app/...` on the mirror).
+ *   `/%20/app/...` on the mirror);
+ * - it holds no control character (C0, TAB included, DEL, C1): `new URL()` drops an
+ *   inner TAB, LF or CR silently, so `/p\nX` requested `/pX`, and an echo of the value
+ *   would carry ESC to a terminal. One a path or password needs is written
+ *   percent-encoded (`%09`).
  *
  * - a `%` in its userinfo starts a valid escape (`%25` for a literal one): Node decodes
  *   the userinfo into the Authorization header and would otherwise fail every request
@@ -186,6 +190,9 @@ export function baseUrlProblem(value: unknown): string | undefined {
   }
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
   if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
+  if (/[\u0000-\u001f\u007f-\u009f]/.test(value)) {
+    return "A base URL cannot contain a control character (a tab, a line break, ESC, DEL); write one it needs percent-encoded, e.g. %09.";
+  }
   // Node decodes the userinfo into the Authorization header and throws "URI malformed" for a
   // "%" that isn't an escape — at request time, as a network error. Reject it here.
   for (const part of [url.username, url.password]) {

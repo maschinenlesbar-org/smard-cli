@@ -7,6 +7,7 @@ import { SmardNetworkError, SmardValidationError } from "../src/client/errors.js
 import { jsonResponse, makeMockTransport, parity } from "./helpers.js";
 
 const ok = () => jsonResponse({ timestamps: [1700000000000] });
+const CONTROL = "A base URL cannot contain a control character (a tab, a line break, ESC, DEL); write one it needs percent-encoded, e.g. %09.";
 
 test("baseUrlProblem holds every base-URL rule, in the CLI's order", () => {
   const cases: [string, string | undefined][] = [
@@ -19,6 +20,13 @@ test("baseUrlProblem holds every base-URL rule, in the CLI's order", () => {
     ["https://h.example/?x=1", "A base URL cannot have a query (?) or fragment (#)."],
     ["https://h.example/#f", "A base URL cannot have a query (?) or fragment (#)."],
     ["https://h.example/ ", "A base URL cannot have surrounding whitespace."],
+    // The URL parser drops an inner TAB, LF or CR silently (another path) and escapes the rest.
+    ["https://h.example/p\n2026-10-09T00:00:00.000Z\tINFO\t[smard.cli]\tforged", CONTROL],
+    ["https://h.example/p\rX", CONTROL],
+    ["https://h.example/p\u001b]0;pwned\u0007\u001b[2J", CONTROL],
+    ["https://u:p\tw@h.example", CONTROL],
+    ["https://h.example/p\u007f", CONTROL],
+    ["https://h.example/p\u0085", CONTROL],
   ];
   for (const [value, reason] of cases) assert.equal(baseUrlProblem(value), reason, value);
 });
@@ -52,7 +60,7 @@ test("the engine rejects a bad base URL as SmardValidationError, not SmardNetwor
 });
 
 test("parity: a bad --base-url / baseUrl gives the same reason on both sides, with no request", async () => {
-  for (const base of ["ftp://h.example", "notaurl", "https://u:secret@h.example/?x", "https://h.example/#f"]) {
+  for (const base of ["ftp://h.example", "notaurl", "https://u:secret@h.example/?x", "https://h.example/#f", "https://h.example/p\nx", "https://u:sec\tret@h.example"]) {
     const { cli, lib: l } = await parity(
       ["--compact", "--base-url", base, "timestamps", "410", "DE", "hour"],
       (transport) => new SmardClient({ transport, baseUrl: base }).timestamps(410, "DE", "hour"),

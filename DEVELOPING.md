@@ -143,7 +143,9 @@ src/
   the library's `baseUrlProblem` / `validateBaseUrl` (`engine.ts`), checked on the
   value as passed: an absolute URL, an `http:`/`https:` scheme, no query (`?`) or
   fragment (`#`) (the API path is appended to it as a string), no surrounding
-  whitespace, and no `%` in the userinfo that isn't an escape (a literal `%` is
+  whitespace, no control character (the URL parser drops an inner tab or line break
+  silently, so another path would be requested; one a path or password needs is
+  written percent-encoded, `%09`), and no `%` in the userinfo that isn't an escape (a literal `%` is
   written `%25`; Node would fail every request with "URI malformed"). The `RequestEngine` constructor throws a `SmardValidationError` for
   a bad base URL — a configuration error, not a `SmardNetworkError` — so a library
   caller's custom `Transport` never receives one, and the `--base-url` option

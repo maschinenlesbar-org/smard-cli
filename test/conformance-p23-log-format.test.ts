@@ -50,8 +50,8 @@ function errorAnswer(message: string): HttpResponse {
  */
 function secretArgv(secret: string): string[] {
   // smard needs no key: the base URL's userinfo is its only secret, sent as Basic auth.
-  // A rejected base URL is a usage error that commander echoes whole (the jsonl leak of
-  // 2026-10-09 result 04 note 4).
+  // One with DEL or C1 is refused (a control character), a usage error that commander
+  // echoes whole (the jsonl leak of 2026-10-09 result 04 note 4).
   return ["--base-url", `http://u:${secret}@127.0.0.1`];
 }
 /**
