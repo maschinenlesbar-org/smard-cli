@@ -371,7 +371,10 @@ help, so every failed run has an ERROR record (`writeCommanderErr`). The log is 
 with the run's redaction (`withRedactedOutput`),
 which replaces a secret in the message only, before it is escaped: the frame is never
 touched, and a secret is kept out of the log in either format. `CliDeps.now` makes the timestamps testable. stdout
-carries data only. A failed write to stdout other than a closed pipe
+carries data only, and a record waits for it: the default `io.err` (`stderrAfterStdout`)
+holds a record while stdout still has data queued and writes it, in order, once that is
+out, so with `2>&1 |` and a slow reader a record never lands inside the JSON. A failed
+write to stdout other than a closed pipe
 (`handleOutputErrors`, in the bin shim, outside `run()`) is an ERROR record of
 `smard.output` (`Could not write to stdout: …`), in the format argv asks for and redacted
 like the run's log (`processLogger`). So are Node's own process warnings
@@ -392,8 +395,9 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`client.test.ts`** — every method's URL mapping, including the `latest` index→data flow — mocked transport.
 - **`cli.test.ts`** — end-to-end command parsing, validation and exit codes — mocked client.
 - **`validate.test.ts`** — `assertValid`, the `SmardValidationError` exit-code mapping and the `parity()` helper.
-- **`io.test.ts`** — `handleOutputErrors` on fake streams: the pipe cases, and a stdout
-  write error as an ERROR record of `smard.output`.
+- **`io.test.ts`** — `handleOutputErrors` and `stderrAfterStdout` on fake streams: the
+  pipe cases, a stdout write error as an ERROR record of `smard.output`, and a record
+  held behind stdout's backlog.
 - **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`, `installWarningLog`); the CLI-level checks are
   P23's.
