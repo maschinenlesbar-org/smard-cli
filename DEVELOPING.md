@@ -156,9 +156,11 @@ src/
   error (`option '--base-url <url>' argument '…' is invalid`), and the CLI's own
   messages echo rejected arguments. `run()` therefore starts with
   `withRedactedOutput(deps, argv)`: it collects the exact userinfo of every argv
-  token and of the value part of `--opt=value` tokens (`credentialsIn`, which also
-  finds it in values that don't parse as a URL and in scheme-less `user:pw@host`),
-  and every line printed on stdout or stderr has those strings replaced by `***`
+  token and of the value part of `--opt=value` tokens that is a URL (`credentialsIn`,
+  which also finds it in URLs that don't parse). Only a value that starts with a scheme
+  counts (a bare `a:b@c` is a region, a User-Agent or a search text as often as a
+  credential), except as the `--base-url` value, where a `user:password@host` typed
+  without its scheme is still a credential; and every line printed on stdout or stderr has those strings replaced by `***`
   (`redactCredentials`), with a pattern-based backstop. A pattern alone can't
   delimit a password that holds a space, quote, `#`, `?` or `/`; the exact strings
   can. The log replaces them in each record's *message* (`redactionFor`), before the

@@ -4,7 +4,7 @@ import { run } from "../src/cli/run.js";
 import { SmardClient } from "../src/client/client.js";
 import type { CliDeps } from "../src/cli/io.js";
 import type { HttpRequest, HttpResponse } from "../src/client/http.js";
-import { SmardNetworkError } from "../src/client/errors.js";
+import { SmardNetworkError, credentialsIn } from "../src/client/errors.js";
 import { makeMockTransport, jsonResponse, untimed } from "./helpers.js";
 
 function makeCli(responder: (req: HttpRequest) => HttpResponse | Promise<HttpResponse>) {
@@ -395,4 +395,21 @@ test("a rejected --base-url whose password holds a space and DEL, C1 or bidi is 
       assert.ok(!all.includes("secret"), `${format} ${JSON.stringify(pw)}: ${all}`);
     }
   }
+});
+
+test("an a:b@c argument (a region, a User-Agent) is neither a credential in the log nor rewritten in the JSON on stdout (L14)", async () => {
+  const region = makeCli(() => jsonResponse({}));
+  assert.equal(await run(["timestamps", "410", "DE:x@y", "hour"], region.deps), 1);
+  assert.match(region.err.join("\n"), /Invalid region "DE:x@y"/);
+  const body = { meta_data: { note: "contact ops:team@smard.example" }, series: [] };
+  const ua = makeCli(() => jsonResponse(body));
+  assert.equal(await run(["--user-agent", "ops:team@smard.example", "--compact", "series", "410", "DE", "hour", "1"], ua.deps), 0);
+  assert.equal(ua.mt.last().headers?.["User-Agent"], "ops:team@smard.example");
+  assert.match(ua.out.join("\n"), /"note":"contact ops:team@smard\.example"/);
+  assert.deepEqual(credentialsIn("ops:team@smard.example"), []);
+  assert.deepEqual(credentialsIn("https://alice:pw@host"), ["alice:pw"]);
+  // A base URL typed without its scheme is still read as one: its password is never echoed.
+  const bare = makeCli(() => jsonResponse(body));
+  assert.equal(await run(["--base-url", "alice:hunter2-pw@mirror.example", "timestamps", "410", "DE", "hour"], bare.deps), 1);
+  assert.ok(!bare.err.join("\n").includes("hunter2-pw"), bare.err.join("\n"));
 });
