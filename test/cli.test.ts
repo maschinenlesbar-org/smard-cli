@@ -438,3 +438,22 @@ test("help for an unknown command is a failed run with an ERROR first, then the 
   for (const record of records.slice(1)) assert.match(record, /^INFO  \[smard\.cli\] .*\S$/);
   assert.ok(records.some((record) => /\] Usage: smard /.test(record)), records.join("\n"));
 });
+
+test("a parse error is logged in the format commander would have parsed (L6)", async () => {
+  const isJsonl = (line: string): boolean => line.startsWith("{");
+  const cases: [string[], boolean][] = [
+    // Repeated: commander keeps the first and refuses the second (once()), so the scan takes the first.
+    [["--log-format", "jsonl", "--log-format=text", "seriesx"], true],
+    [["--log-format", "text", "--log-format", "jsonl", "seriesx"], false],
+    // --log-format is --user-agent's (or --base-url's) value, so `jsonl` is an unknown command, logged in text.
+    [["--user-agent", "--log-format", "jsonl", "timestamps", "410", "DE", "hour"], false],
+    [["--timeout", "--log-format", "jsonl", "timestamps", "410", "DE", "hour"], false],
+    // commander takes "--" as the User-Agent and then parses --log-format jsonl.
+    [["--user-agent", "--", "--log-format", "jsonl", "seriesx"], true],
+  ];
+  for (const [argv, jsonl] of cases) {
+    const cli = makeCli(() => jsonResponse({ timestamps: [1] }));
+    assert.equal(await run(argv, cli.deps), 1, argv.join(" "));
+    assert.ok(cli.err.length > 0 && cli.err.every((line) => isJsonl(line) === jsonl), `${argv.join(" ")}:\n${cli.err.join("\n")}`);
+  }
+});

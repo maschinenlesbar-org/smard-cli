@@ -358,7 +358,11 @@ code point and ends in `… (N more characters)`. The areas are `cli` (usage err
 library's validation and parse errors), `api` (the API's answers: an HTTP error status)
 and `http` (the connection, the cleartext warning); smard writes no files, so it has no
 `output` area. Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
-directly. `run()` builds the logger from argv before commander parses it, so commander's
+directly. `run()` builds the logger from argv before commander parses it
+(`logFormatFromArgv`, which skips the value of the program's value options such as
+`--user-agent` and takes the first `--log-format`, as `once()` does; used only for the
+records of a parse error; a `preAction` hook then sets the format commander parsed, so
+an option's value that looks like `--log-format` never switches it), so commander's
 own usage errors are records too: its `error: …` an ERROR of `cli` (a `(Did you mean
 …?)` line joined to it), the help it shows after one an INFO record per line, and `help`
 for an unknown command an ERROR "missing command: `smard <subcommand>`" before that
