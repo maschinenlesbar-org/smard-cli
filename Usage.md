@@ -13,7 +13,7 @@ npm i -g @maschinenlesbar.org/smard-cli
 ```
 
 The installed binary is **`smard`**. To run from a checkout instead of a global
-install, replace `smard` with `node dist/src/cli/index.js` (after `npm run build`).
+install, replace `smard` with `node apps/cli/dist/src/cli/index.js` (after `npm run build`).
 
 ## Concepts in one line
 

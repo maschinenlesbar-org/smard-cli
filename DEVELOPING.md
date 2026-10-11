@@ -20,14 +20,14 @@ for the [SMARD chart-data API](https://smard.api.bund.dev/) (`www.smard.de`).
 
 ```bash
 npm install
-npm run build        # compiles TypeScript to dist/
+npm run build        # compiles every workspace (tsc -b) to its dist/
 ```
 
 Run the locally built CLI without a global install:
 
 ```bash
-node dist/src/cli/index.js --help
-# or, after `npm link`:
+node apps/cli/dist/src/cli/index.js --help    # or: npm start -- --help
+# or, after `npm link --workspace apps/cli`:
 smard --help
 ```
 
@@ -107,9 +107,46 @@ returning an empty list.
 
 ## Architecture
 
+The repository is an **npm workspace** with two folders: `apps/` holds the programs it
+publishes, `packages/` the libraries they are built from.
+
 ```
-src/
-  client/
+package.json         # private workspace manifest: no version, never packed
+apps/cli/            # @maschinenlesbar.org/smard-cli — the published package
+  package.json       # its version, bin, files, bundleDependencies
+  src/index.ts       # library entry: re-exports @maschinenlesbar.org/smard-client
+  src/cli/           # the CLI (below)
+  test/              # CLI tests and every conformance-*.test.ts
+packages/client/     # @maschinenlesbar.org/smard-client — private, bundled into the CLI
+  src/               # the API client (below)
+  test/              # tests that only touch the client, + the transport helpers
+tools/pack/          # prepack/postpack: bundle the client and commander into the tarball
+tools/bump.mjs       # version bump + commit + tag (npm run bump)
+tsconfig.docs.json   # TypeDoc only: the package entry, with the client read from its sources
+```
+
+- **The client is its own package** so a later MCP app can share it with the CLI. It is
+  never published on its own: `apps/cli`'s `prepack` copies it (and commander) into the
+  app's `node_modules`, and `bundleDependencies` ships it inside the tarball. The library
+  entry re-exports the client's `"."`, so `import { SmardClient } from
+  "@maschinenlesbar.org/smard-cli"` is unchanged.
+- **The client's exports:** `"."` is the public library surface (`src/index.ts`);
+  `"./internal/*"` maps to any module (`…/smard-client/internal/engine`) for what the
+  CLI needs beyond that; `"./test/*"` reaches the client's test helpers from the CLI's
+  tests (not bundled). Only `"."` is part of the library.
+- **Dependencies point one way:** the app depends on the client, the client on nothing
+  in the workspace.
+- **The version lives in `apps/cli/package.json`.** The root has none; a plain
+  `npm version` at the root is refused. Release with `npm run bump -- <patch|minor|major>`,
+  which bumps the app, commits (the bare version as the message) and tags `vX.Y.Z`.
+- **TypeScript:** `tsconfig.base.json` holds the compiler options; every workspace has a
+  `tsconfig.json` (`src/`) and a `tsconfig.test.json` (`test/`), and the root
+  `tsconfig.json`/`tsconfig.test.json` reference them, built with `tsc -b`.
+
+The client (`packages/client/src/`) and the CLI (`apps/cli/src/`):
+
+```
+packages/client/src/
     enums.ts     # Region/Resolution value sets + the filter catalogue (FILTERS)
     types.ts     # response interfaces (TimestampIndex, SeriesResult, TableResult)
     query.ts     # dependency-free query-string builder
@@ -118,7 +155,8 @@ src/
     errors.ts    # SmardError / SmardApiError / SmardNetworkError / SmardParseError / SmardValidationError
     validate.ts  # input rules (Problem functions) + assertValid, shared with the CLI
     client.ts    # SmardClient — the chart-data surface over the engine
-  cli/
+    index.ts     # the client's public surface (the library entry re-exports it)
+apps/cli/src/cli/
     io.ts        # injectable I/O seam (stdout/stderr/file), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
     shared.ts    # option parsers, global-option resolver, JSON renderer
@@ -168,7 +206,7 @@ src/
   can. The log replaces them in each record's *message* (`redactionFor`), before the
   record is cut and escaped, and writes the record to the raw stderr: the frame (time,
   level, topic) is never touched, and a password with DEL, C1 or bidi characters is
-  matched in its raw form. `test/conformance-p1-cli-redaction.test.ts` checks ten such passwords in
+  matched in its raw form. `apps/cli/test/conformance-p1-cli-redaction.test.ts` checks ten such passwords in
   seven URL shapes on every echo path.
 - **Plain `http:` warning (CLI).** `cleartextProblem(baseUrl, secrets?)` (`engine.ts`,
   exported) returns one sentence when requests to `baseUrl` would travel unencrypted —
@@ -181,22 +219,22 @@ src/
   command's positional arguments are parsed with the library's checks (`parse`), so
   help, version and usage errors — commander's and a bad filter, region, resolution or
   timestamp — never warn, stdout and the exit code are unchanged, and the library
-  never warns. `test/conformance-p20-cleartext-warning.test.ts` is the shared check (P20).
+  never warns. `apps/cli/test/conformance-p20-cleartext-warning.test.ts` is the shared check (P20).
 - **README links (P21).** README.md ships in the npm tarball and is shown on npmjs.com,
   so a relative link in it must point to a file the package ships (`files` in
-  package.json); any other document is linked by its absolute GitHub URL.
-  `test/conformance-p21-readme-links.test.ts` checks every relative link.
+  apps/cli/package.json); any other document is linked by its absolute GitHub URL.
+  `apps/cli/test/conformance-p21-readme-links.test.ts` checks every relative link.
 
 ### Library / technical terms
 
-**API client.** [`SmardClient`](src/client/client.ts) — the typed wrapper over
+**API client.** [`SmardClient`](packages/client/src/client.ts) — the typed wrapper over
 the chart-data endpoints. Usable as a library independently of the CLI.
 
 **Transport.** A single function `(HttpRequest) => Promise<HttpResponse>`
-([`http.ts`](src/client/http.ts)). The default uses Node's built-in
+([`http.ts`](packages/client/src/http.ts)). The default uses Node's built-in
 `http`/`https`; tests inject a mock. This is the only HTTP seam.
 
-**Request engine.** [`RequestEngine`](src/client/engine.ts) — builds URLs,
+**Request engine.** [`RequestEngine`](packages/client/src/engine.ts) — builds URLs,
 serialises queries, applies retry/backoff, decodes JSON/raw responses and maps
 errors. Sits between the client and the transport.
 
@@ -209,11 +247,11 @@ errors. Sits between the client and the transport.
 **Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before
 `run()`: an EPIPE on stdout (`| head`) exits 0 quietly, an EPIPE on stderr is
 ignored so a failed run keeps its exit code, and any other stdout error is an ERROR
-record of `smard.output` (`Could not write to stdout: …`) and exits 1. `test/conformance-p7-pipes-exit-codes.test.ts`
+record of `smard.output` (`Could not write to stdout: …`) and exits 1. `apps/cli/test/conformance-p7-pipes-exit-codes.test.ts`
 runs the built bin to check it.
 
 **CliDeps / CliIO.** The dependency-injection seam for the CLI
-([`io.ts`](src/cli/io.ts)): a client factory plus an I/O object (`out`/`err`/…).
+([`io.ts`](apps/cli/src/cli/io.ts)): a client factory plus an I/O object (`out`/`err`/…).
 Lets the whole CLI run in tests with a mocked client and captured output — no
 subprocess.
 
@@ -233,14 +271,14 @@ says "the server asked to retry after N s, longer than the 30 s the client waits
 not retried" and carries `retryAfterMs`. After spent retries the message ends
 "(after N retries)" and `SmardApiError.retries` holds the count.
 `SmardApiError.isRetryable` flags these statuses
-(`test/conformance-p6-retry-policy.test.ts`).
+(`apps/cli/test/conformance-p6-retry-policy.test.ts`).
 
 Each retry is announced: the engine option `onRetry(event: RetryEvent)` (exported type:
 `{ retry` (1-based), `maxRetries`, `delayMs`, `status?` (absent for a reset), `url` (userinfo
 redacted) `}`) is called once per retry right before the sleep, never when there is none, and
 a throw in it is swallowed. The CLI's `action()` sets it to log one `WARN` record of
 `smard.http`, `HTTP 503 from <host>: retry 1 of 3 in 2 s` (`retryMessage`; host only, whole
-seconds, ms under 1 s). Tests: `test/retry-log.test.ts`.
+seconds, ms under 1 s). Tests: `apps/cli/test/retry-log.test.ts`.
 
 **maxResponseBytes.** A hard cap (default 100 MiB; `0` = unlimited) on response
 body size, defending against memory exhaustion; a breach aborts the request with
@@ -249,7 +287,7 @@ body size, defending against memory exhaustion; a breach aborts the request with
 
 **The transport contract (engine-enforced).** The engine holds the documented
 limits for any transport, not only the built-in one
-(`test/conformance-p5-transport-contract.test.ts`): it runs every call under the
+(`apps/cli/test/conformance-p5-transport-contract.test.ts`): it runs every call under the
 `timeoutMs` deadline and passes an `AbortSignal` in `HttpRequest.signal` (a `fetch`
 transport hands it on; the call rejects at the deadline either way), checks
 `maxResponseBytes` on the body a transport returns, reads headers from a plain
@@ -277,7 +315,7 @@ default transport rejects with a `SmardNetworkError`, never a raw `TypeError`.
 values the CLI's `--base-url` / `--user-agent` reject — instead of silently meaning
 production, the default User-Agent or a different path on a mirror.
 
-**Error types.** [`errors.ts`](src/client/errors.ts): `SmardApiError` (non-2xx,
+**Error types.** [`errors.ts`](packages/client/src/errors.ts): `SmardApiError` (non-2xx,
 carries `status`/`detail`/`url`/`body`), `SmardNetworkError` (transport
 failure/timeout), `SmardResponseTooLargeError` (size-cap breach, a subclass of
 `SmardNetworkError`), `SmardParseError` (bad JSON) and `SmardValidationError` (an
@@ -290,7 +328,7 @@ The base URL lives in a real `#private` field of the engine, so `console.log`,
 `util.inspect` and `JSON.stringify` of a client never show its password, and the
 engine scrubs the base URL's userinfo (raw and percent-decoded) from error bodies,
 details, transport error text and the `cause` chain
-(`test/conformance-p2-library-redaction.test.ts`) — and with it the forms a server
+(`apps/cli/test/conformance-p2-library-redaction.test.ts`) — and with it the forms a server
 echoes it back in (`echoedCredentialForms`, exported): the `Authorization: Basic` value,
 the decoded `user:password`, and the password alone from 4 characters on
 (`redactSecrets`, exported). The CLI replaces the Basic value and the pair on stdout and
@@ -305,7 +343,7 @@ message names (the request URL, the default transport's refused URL) are
 cut at `MAX_MESSAGE_VALUE_LENGTH` (500) characters with `cutForMessage`, never inside a
 surrogate pair (`cutText`), so the message stays well-formed; `SmardApiError.body` keeps
 the full text.
-`test/conformance-p8-p9-p13-responses-and-errors.test.ts` holds the shared checks
+`apps/cli/test/conformance-p8-p9-p13-responses-and-errors.test.ts` holds the shared checks
 for the declared charset (P8), 2xx bodies without the documented shape (P9) and
 wrong-typed input (P13).
 
@@ -315,14 +353,14 @@ wrapped in `once()` (`shared.ts`): commander keeps the last of a repeated option
 and drops the others without a word, so a repeat is a usage error naming the flag.
 
 **Input validation.** A rule about what a request may contain belongs in the
-library, in [`validate.ts`](src/client/validate.ts) or next to the option it
+library, in [`validate.ts`](packages/client/src/validate.ts) or next to the option it
 guards, as an exported `…Problem(value)` function that returns the reason a value
 is invalid (or `undefined`). The library enforces it with `assertValid(name,
 value, problem)`, which throws `SmardValidationError` with the message
 `Invalid <name>: <reason>` before any request (methods that return a promise
 reject; constructors throw). The CLI's parsers call the same functions and turn
 the reason into a usage error rather than keeping a copy. Tests check this with
-the `parity()` helper in `test/helpers.ts`, which sends one input through `run()`
+the `parity()` helper in `apps/cli/test/helpers.ts`, which sends one input through `run()`
 and through the library on one recording mock transport.
 
 **FILTERS / RegionValues / ResolutionValues / FilterGroupValues.** The exported
@@ -333,7 +371,7 @@ listing commands and as `Region`/`Resolution`/`FilterGroup` union types.
 exhaustive: the API accepts any integer filter id.
 
 **Validation boundary.** The library owns the input rules
-([`validate.ts`](src/client/validate.ts)): `SmardClient` rejects a filter or
+([`validate.ts`](packages/client/src/validate.ts)): `SmardClient` rejects a filter or
 timestamp that is not a non-negative safe integer, a region outside
 `RegionValues` and a resolution outside `ResolutionValues` with a
 `SmardValidationError` before any request. The CLI only turns the argv strings
@@ -354,7 +392,7 @@ origin's string element (e.g. `"1/../evil"`) is refused before it gets there
 
 ## The log on stderr
 
-Every diagnostic line on stderr is a log record (`src/cli/log.ts`): a timestamp, a level
+Every diagnostic line on stderr is a log record (`apps/cli/src/cli/log.ts`): a timestamp, a level
 (`ERROR`, `WARN`, `INFO`) and a topic, `smard.<area>`. `--log-format text` (the default)
 writes it log4j style, `<ISO 8601 UTC> <LEVEL padded to 5> [<topic>] <message>`;
 `--log-format jsonl` writes one JSON object per line with exactly `ts`, `level`, `topic`
@@ -397,8 +435,13 @@ of this, and its body is shared across the *-cli repos.
 ## Testing
 
 ```bash
-npm test          # builds, then runs `node --test` over dist/test
+npm test          # builds, then runs `node --test` over each workspace's dist/test
+npm run coverage  # the same tests in one run, with a coverage report
+node --test apps/cli/dist/test/cli.test.js   # one file, after a build
 ```
+
+The client's tests are in `packages/client/test/` (`query`, `http`, `engine`, `client`),
+everything that drives the CLI is in `apps/cli/test/`.
 
 - **`query.test.ts`** — query-string serialisation.
 - **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
@@ -409,7 +452,7 @@ npm test          # builds, then runs `node --test` over dist/test
 - **`io.test.ts`** — `handleOutputErrors` and `stderrAfterStdout` on fake streams: the
   pipe cases, a stdout write error as an ERROR record of `smard.output`, and a record
   held behind stdout's backlog.
-- **`log.test.ts`** — the record helpers of `src/cli/log.ts` on their own
+- **`log.test.ts`** — the record helpers of `apps/cli/src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`, `installWarningLog`); the CLI-level checks are
   P23's.
 - **`conformance-p*.test.ts`** — the checks shared across the `*-cli` repos (fix plan of
@@ -424,9 +467,13 @@ npm test          # builds, then runs `node --test` over dist/test
 
 GitHub Actions workflows under `.github/workflows/`:
 
-- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR.
-- **release.yml** — on a `v*` tag: verify the tag matches `package.json`, test, `npm pack`, and create a GitHub Release with the tarball.
-- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): publish to npm via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
+- **ci.yml** — type-check, build and test on Node 22/24 for every push and PR; then pack the
+  real tarball, check the pack left nothing behind, install it globally with the registry out
+  of reach and run the bin.
+- **release.yml** — on a `v*` tag (made by `npm run bump`): verify the tag matches
+  `apps/cli/package.json`, test, write the SBOMs (scoped to the `apps/cli` workspace), then
+  `npm pack --workspace apps/cli`, and create a GitHub Release with the tarball.
+- **publish.yml** — manual dispatch from the release tag (`gh workflow run publish.yml --ref vX.Y.Z`; the version is the tag's): `npm publish --workspace apps/cli` via OIDC **Trusted Publishing** (no stored `NPM_TOKEN`) with provenance.
 - **docs.yml** — build the project website (`site/`, English and German) with the TypeDoc API docs
   under `/api/`, and deploy both to GitHub Pages on each `v*` tag.
   TypeDoc runs from the isolated, lockfile-pinned `tools/docs/` toolchain because it
@@ -442,7 +489,9 @@ The project website — <https://maschinenlesbar-org.github.io/smard-cli/> in En
 reference under `/api/`. Its content comes from this repository: the README intro and quick
 start, the command tree of the built CLI (`site/scripts/cli-reference.mjs`), `Usage.md`,
 `GLOSSARY.md` and its German version `GLOSSARY.de.md`, the skills, and the skill examples in
-`EXAMPLE.md` and `EXAMPLE.de.md`. The only repo-specific files are `site/_config.yml` and
+`EXAMPLE.md` and `EXAMPLE.de.md`. The only repo-specific files are `site/_config.yml` (which
+also says where the published manifest and the built program are: `manifest:
+apps/cli/package.json`, `program: apps/cli/dist/src/cli/program.js`) and
 `site/_data/project.yml` (the German intro and the access requirements); the rest of `site/` is
 identical in every maschinenlesbar.org CLI, so change it in all of them together. When the
 README intro changes, update the German intro in `site/_data/project.yml`.
