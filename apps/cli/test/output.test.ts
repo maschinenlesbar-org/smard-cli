@@ -56,16 +56,31 @@ test("--compact takes the gap path only for an answer holding a huge string, the
   assert.deepEqual(out, ['"stub"', '"stub"', '"stub"', '"stub"', '"stub"']);
 });
 
-test("--compact prints a deeply nested answer on one line", async () => {
+test("--compact prints a deeply nested answer on one line where the runtime's fast path can", async () => {
   const depth = 5_000;
   const cli = makeCli(() => ({
     status: 200,
     headers: { "content-type": "application/json" },
     body: Buffer.from(`{"meta_data":{"x":${"[".repeat(depth)}${"]".repeat(depth)}},"series":[[1577836800000,12.5]]}`),
   }));
-  assert.equal(await run(["--compact", "series", "410", "DE", "hour", "1577836800000"], cli.deps), 0);
-  assert.equal(cli.out.length, 1);
-  assert.ok(cli.out[0]!.startsWith('{"meta_data":{"x":[[['));
+  const code = await run(["--compact", "series", "410", "DE", "hour", "1577836800000"], cli.deps);
+  // Node 26's fast path is iterative. On Node 22 and 24 it recurses, and how deep it gets depends
+  // on the stack frame size: an x86_64 runner overflows at 5,000 levels where arm64 does not.
+  let fastPathCan = true;
+  try {
+    JSON.stringify(JSON.parse(`${"[".repeat(depth)}${"]".repeat(depth)}`));
+  } catch {
+    fastPathCan = false;
+  }
+  if (fastPathCan) {
+    assert.equal(code, 0, cli.err.join("\n"));
+    assert.equal(cli.out.length, 1);
+    assert.ok(cli.out[0]!.startsWith('{"meta_data":{"x":[[['));
+  } else {
+    assert.equal(code, 1);
+    assert.deepEqual(cli.out, []);
+    assert.deepEqual(cli.err, ["ERROR [smard.output] The answer is nested too deeply to print."]);
+  }
 });
 
 test("printed JSON escapes DEL, C1 and the bidi controls that JSON.stringify leaves raw", async () => {
