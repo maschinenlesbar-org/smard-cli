@@ -218,7 +218,7 @@ eine Stufe (`ERROR`, `WARN`, `INFO`) und ein Thema `smard.<Bereich>`, als Text (
 von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Zeile. Die Bereiche:
 `cli` (Bedienfehler, Meldungen von commander, unerwartete Fehler), `api` (die Antworten
 der API: ein Fehlerstatus wie das `404` für ein Fenster ohne Daten, und eine fehlerhafte
-Antwort – kein JSON, die falsche Form, ein unbekannter Zeichensatz), `http` (die
+Antwort – kein JSON, die falsche Form, ein unbekannter Zeichensatz, eine Zahl, die JSON nicht genau tragen kann), `http` (die
 Verbindung, die Warnung vor unverschlüsseltem `http:` und je Wiederholung eine WARN-Zeile vor dem Warten) und `output` (ein fehlgeschlagenes
 Schreiben auf stdout). Ein Eintrag ist immer eine Zeile; Steuerzeichen darin werden
 maskiert.

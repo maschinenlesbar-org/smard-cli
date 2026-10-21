@@ -200,6 +200,10 @@ its stderr reader has gone away (`2>&1 | true`).
   "series": [[timestamp, number or null], …]}` (an error page from a proxy, or a
   changed format), so the CLI refuses to print it as data or read it as "no data".
   `latest` also exits `1` if an index lists no windows at all.
+- **Exit `1` with "the number … cannot be represented exactly"** — the answer held a
+  number JSON can't carry exactly (past 2^53, out of a double's range, or too small
+  for one), so the CLI refuses it rather than print a changed value. SMARD's
+  timestamps and values are far from those limits; it points to a broken answer.
 
 ## Global options
 

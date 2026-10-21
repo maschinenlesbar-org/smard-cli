@@ -104,6 +104,16 @@ returning an empty list.
 >
 > `latest()` on an index that lists no windows throws a `SmardError` rather than
 > returning a made-up empty result.
+>
+> Before any shape check, `getJson` refuses a body with a number `JSON.parse` can't
+> carry exactly (`firstInexactNumber`): one out of a double's range (`1e400` would
+> become `Infinity`, printed as `null`), one past 2^53 that would print as another
+> number (`12345678901234567890`, in any written form), and a non-zero one too small
+> for a double (`1e-400` would become `0`). The message is `Unexpected response from
+> <path>: the number <N> cannot be represented exactly.` (`SmardParseError`, exit 1).
+> Past 2^53 the number as printed (`String(value)`) is compared with the number as
+> written, so `1E23` passes; below 2^53 a decimal fraction keeps a double's precision,
+> so SMARD's millisecond timestamps and decimal values pass unchanged.
 
 ## Architecture
 
