@@ -13,7 +13,8 @@ residual load and wholesale prices as clean JSON you can pipe straight into
 [`jq`](https://jqlang.github.io/jq/).
 
 - **Works out of the box** — no account, no API key, no configuration. Install and query.
-- **Clean JSON output** — pretty-printed by default, `--compact` for one-line/scripting.
+- **Clean JSON output** — pretty-printed by default, `--compact` for one-line/scripting;
+  characters a terminal would act on (DEL, C1 controls, bidi controls) are printed as `\uXXXX` escapes.
 - **Seven commands** — discover filters/regions, fetch the newest window in one call, or navigate timestamps manually.
 - **No credentials to manage** — the SMARD API is fully open; this tool only reads.
 

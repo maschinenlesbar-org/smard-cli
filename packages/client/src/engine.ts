@@ -150,6 +150,22 @@ export function parseRetryAfter(
 }
 
 /**
+ * True for the Unicode bidirectional formatting characters: ALM (U+061C), LRM/RLM
+ * (U+200E/U+200F), the embeddings and overrides U+202A–U+202E and the isolates
+ * U+2066–U+2069. A terminal applies them to the text that follows, so an override
+ * in server text can reorder what the user sees ("Trojan Source" spoofing).
+ */
+export function isBidiControl(code: number): boolean {
+  return (
+    code === 0x061c ||
+    code === 0x200e ||
+    code === 0x200f ||
+    (code >= 0x202a && code <= 0x202e) ||
+    (code >= 0x2066 && code <= 0x2069)
+  );
+}
+
+/**
  * Strip control characters (all C0/C1 controls, plus DEL) out of a string that
  * originates in an attacker-controlled response body — the API error `detail`.
  * `JSON.parse` decodes an escaped ESC (a "backslash-u-001b" JSON sequence) in an
@@ -157,8 +173,8 @@ export function parseRetryAfter(
  * could drive ANSI/OSC escape sequences (cursor moves, title changes, misleading
  * overwrites) into the user's terminal when the message is printed raw to stderr.
  * This only covers text that flows into an error message; the CLI's JSON output is
- * escaped separately (escapeControlChars in cli/shared.ts), since `JSON.stringify`
- * alone leaves DEL and the C1 range raw.
+ * escaped separately (escapeControlChars in cli/output.ts), since `JSON.stringify`
+ * alone leaves DEL, the C1 range and the bidi controls raw.
  */
 function sanitizeServerText(text: string): string {
   let out = "";

@@ -67,3 +67,17 @@ test("--compact prints a deeply nested answer on one line", async () => {
   assert.equal(cli.out.length, 1);
   assert.ok(cli.out[0]!.startsWith('{"meta_data":{"x":[[['));
 });
+
+test("printed JSON escapes DEL, C1 and the bidi controls that JSON.stringify leaves raw", async () => {
+  // Built by char code, so the source holds none of these characters.
+  const raw = [0x7f, 0x85, 0x9b, 0x061c, 0x200e, 0x200f, 0x202a, 0x202e, 0x2066, 0x2069].map((c) => String.fromCharCode(c));
+  const served = { meta_data: { name: `Strom${raw.join("")}` }, series: [[1577836800000, 12.5]] };
+  for (const argv of [["series", "410", "DE", "hour", "1577836800000"], ["--compact", "series", "410", "DE", "hour", "1577836800000"]]) {
+    const cli = makeCli(() => jsonResponse(served));
+    assert.equal(await run(argv, cli.deps), 0);
+    const text = cli.out.join("\n");
+    assert.ok(![...text].some((c) => raw.includes(c)), argv.join(" "));
+    assert.match(text, /Strom\\u007f\\u0085\\u009b\\u061c\\u200e\\u200f\\u202a\\u202e\\u2066\\u2069/);
+    assert.deepEqual(JSON.parse(text), served);
+  }
+});
