@@ -65,6 +65,10 @@ new SmardClient({
 });
 ```
 
+Every option is declared `?: T | undefined`, and `undefined` means the default, as an
+omitted option does: a consumer compiled with `exactOptionalPropertyTypes` can write
+`{ baseUrl: process.env.SMARD_BASE_URL }` (`packages/client/test/types.test.ts`).
+
 ### Methods
 
 `client.timestamps(filter, region, resolution)`, `client.series(filter, region, resolution, timestamp)`,
@@ -460,6 +464,8 @@ everything that drives the CLI is in `apps/cli/test/`.
 - **`http.test.ts`** — the default transport against a real loopback `http.createServer`.
 - **`engine.test.ts`** — URL building, JSON decoding, error mapping, 429/503 retry — mocked transport.
 - **`client.test.ts`** — every method's URL mapping, including the `latest` index→data flow — mocked transport.
+- **`types.test.ts`** — a consumer compiled by `tsc` with `exactOptionalPropertyTypes` can pass
+  `undefined` for any option (starts a process, 30 s), and `undefined` means the default.
 - **`cli.test.ts`** — end-to-end command parsing, validation and exit codes — mocked client.
 - **`validate.test.ts`** — `assertValid`, the `SmardValidationError` exit-code mapping and the `parity()` helper.
 - **`io.test.ts`** — `handleOutputErrors` and `stderrAfterStdout` on fake streams: the

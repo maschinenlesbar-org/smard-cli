@@ -43,23 +43,23 @@ export interface EngineOptions {
    * Base URL of the API. Defaults to https://www.smard.de when left `undefined`;
    * a blank or whitespace-padded value is rejected.
    */
-  baseUrl?: string;
+  baseUrl?: string | undefined;
   /**
    * Swappable transport. Defaults to the built-in node http/https transport. The engine
    * enforces `timeoutMs` and `maxResponseBytes` for any transport, reads its headers in
    * any case (a fetch `Headers` or a `Map` too) and its body as any ArrayBuffer view, and
    * turns whatever it throws into a `SmardNetworkError`.
    */
-  transport?: Transport;
+  transport?: Transport | undefined;
   /** Value of the User-Agent header; `undefined` means "smard-cli", a blank value is rejected. */
-  userAgent?: string;
+  userAgent?: string | undefined;
   /**
    * Time limit per request in milliseconds, covering the whole response body, not
    * only idle gaps: an integer from 0 (no timeout) to MAX_TIMEOUT_MS (2^31 - 1 ms).
    * Defaults to 30 s. Enforced by the engine for every transport (the request's
    * `signal` aborts at the deadline).
    */
-  timeoutMs?: number;
+  timeoutMs?: number | undefined;
   /**
    * Number of automatic retries for transient (429/503) responses and reset
    * connections (`ECONNRESET`, `UND_ERR_SOCKET`, …), an integer from 0 to
@@ -68,27 +68,27 @@ export interface EngineOptions {
    * response's `Retry-After` when that is longer (up to `MAX_RETRY_AFTER_MS`; a
    * longer one is not retried, and the SmardApiError says so).
    */
-  maxRetries?: number;
+  maxRetries?: number | undefined;
   /**
    * Base backoff between retries in milliseconds (grows linearly), an integer
    * 0..`MAX_RETRY_AFTER_MS` (30 000); default 200. It is also the floor under a
    * `Retry-After`: the header can lengthen a wait, never shorten it.
    */
-  retryDelayMs?: number;
+  retryDelayMs?: number | undefined;
   /**
    * Hard cap on response body size in bytes (defends against memory exhaustion
    * from a hostile/buggy endpoint), a non-negative integer. Defaults to 100 MiB;
    * set to 0 for no limit. Enforced by the engine for every transport: the built-in
    * one aborts the download early, any other is checked on the body it returns.
    */
-  maxResponseBytes?: number;
+  maxResponseBytes?: number | undefined;
   /** Injectable sleep, primarily for deterministic tests. */
-  sleep?: (ms: number) => Promise<void>;
+  sleep?: ((ms: number) => Promise<void>) | undefined;
   /**
    * Called once per retry, right before the backoff sleep, for each retried 429/503
    * and reset connection; never when there is no retry. A throw is swallowed.
    */
-  onRetry?: (event: RetryEvent) => void;
+  onRetry?: ((event: RetryEvent) => void) | undefined;
 }
 
 /** What `EngineOptions.onRetry` is told about one retry. */
