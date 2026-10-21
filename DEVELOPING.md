@@ -176,7 +176,8 @@ packages/client/src/
 apps/cli/src/cli/
     io.ts        # injectable I/O seam (stdout/stderr/file), the logger and the clock
     log.ts       # the stderr log: records with ts, level, topic; --log-format text|jsonl
-    shared.ts    # option parsers, global-option resolver, JSON renderer
+    shared.ts    # option parsers, global-option resolver, action()
+    output.ts    # the JSON renderer: escapes, --compact, a too-deep answer as an OutputError
     commands/    # chart (timestamps/series/latest/table) + catalogue commands
     program.ts   # assembles the commander program from injectable deps
     run.ts       # parses argv -> exit code (no process.exit; testable)
@@ -426,8 +427,9 @@ and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cu
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 library's validation errors), `api` (the API's answers: an HTTP error status, and a
 malformed answer — a `SmardParseError`: bad JSON, an unknown charset, a 2xx body without
-the documented shape, an index element that is no timestamp), `http` (the connection, the cleartext warning) and `output` (a failed write to stdout;
-smard writes no files, so there is no `-o`). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
+the documented shape, an index element that is no timestamp), `http` (the connection, the cleartext warning) and `output` (a failed write to stdout, and
+an answer nested too deeply to pretty-print — an `OutputError` from `renderJson` that
+suggests `--compact`; smard writes no files, so there is no `-o`). Code logs through `logOf(deps)` and never writes diagnostics with `io.err`
 directly. `run()` builds the logger from argv before commander parses it
 (`logFormatFromArgv`, which skips the value of the program's value options such as
 `--user-agent` and takes the first `--log-format`, as `once()` does; used only for the
@@ -474,6 +476,10 @@ everything that drives the CLI is in `apps/cli/test/`.
 - **`io.test.ts`** — `handleOutputErrors` and `stderrAfterStdout` on fake streams: the
   pipe cases, a stdout write error as an ERROR record of `smard.output`, and a record
   held behind stdout's backlog.
+- **`output.test.ts`** — the renderer (`output.ts`): an answer nested too deeply to
+  pretty-print is an ERROR record of `smard.output` suggesting `--compact`; `--compact`
+  takes V8's fast path unless the answer holds a string or key of 64 Mi characters or more
+  (on Node 26 the fast path aborts on a ~250 MB string, but only it prints very deep nesting).
 - **`log.test.ts`** — the record helpers of `apps/cli/src/cli/log.ts` on their own
   (`escapeForRecord`, `formatLogRecord`, `installWarningLog`); the CLI-level checks are
   P23's.

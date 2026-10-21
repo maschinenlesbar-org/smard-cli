@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { CliDeps } from "../io.js";
-import { action, once, renderJson } from "../shared.js";
+import { action, once } from "../shared.js";
+import { renderJson } from "../output.js";
 import { FilterGroupValues, RegionValues, ResolutionValues, type FilterGroup } from "@maschinenlesbar.org/smard-client/internal/enums";
 import { filtersByGroup } from "@maschinenlesbar.org/smard-client/internal/catalogue";
 

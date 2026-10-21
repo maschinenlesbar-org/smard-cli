@@ -220,7 +220,8 @@ von log4j) oder mit `--log-format jsonl` als ein JSON-Objekt pro Zeile. Die Bere
 der API: ein Fehlerstatus wie das `404` für ein Fenster ohne Daten, und eine fehlerhafte
 Antwort – kein JSON, die falsche Form, ein unbekannter Zeichensatz, eine Zahl, die JSON nicht genau tragen kann), `http` (die
 Verbindung, die Warnung vor unverschlüsseltem `http:` und je Wiederholung eine WARN-Zeile vor dem Warten) und `output` (ein fehlgeschlagenes
-Schreiben auf stdout). Ein Eintrag ist immer eine Zeile; Steuerzeichen darin werden
+Schreiben auf stdout oder eine Antwort, zu tief verschachtelt für die eingerückte Ausgabe;
+`--compact` gibt sie aus). Ein Eintrag ist immer eine Zeile; Steuerzeichen darin werden
 maskiert.
 
 ---

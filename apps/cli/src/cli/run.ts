@@ -5,6 +5,7 @@
 import { CommanderError, type Command } from "commander";
 import { buildProgram, defaultDeps } from "./program.js";
 import { logOf, type CliDeps } from "./io.js";
+import { OutputError } from "./output.js";
 import { DEFAULT_LOG_FORMAT, createLogger, logFormatFromArgv, type LogFormat, type Logger } from "./log.js";
 import {
   SmardApiError,
@@ -186,11 +187,12 @@ export function withRedactedOutput(deps: CliDeps, argv: readonly string[]): CliD
 /**
  * The log area of a `SmardError` that is neither an API error nor a usage error: the
  * connection (`http`), a malformed answer (`api`: bad JSON, an unknown charset, a 2xx body
- * without the documented shape — the API's answer as much as an error status is), else
- * `cli`.
+ * without the documented shape — the API's answer as much as an error status is), the
+ * output (`output`: an answer too deeply nested to print), else `cli`.
  */
 function areaOf(err: SmardError): string {
   if (err instanceof SmardNetworkError) return "http";
+  if (err instanceof OutputError) return "output";
   if (err instanceof SmardParseError) return "api";
   return "cli";
 }

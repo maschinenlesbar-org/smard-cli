@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import type { CliDeps } from "../io.js";
-import { action, renderJson, requireInt } from "../shared.js";
+import { action, requireInt } from "../shared.js";
+import { renderJson } from "../output.js";
 import { assertRegion, assertResolution } from "@maschinenlesbar.org/smard-client/internal/validate";
 
 // Each command parses its positionals in argument order (filter, region, resolution,
