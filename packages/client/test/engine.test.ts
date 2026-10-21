@@ -1,7 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MAX_RETRY_AFTER_MS, RequestEngine, parseRetryAfter } from "../src/engine.js";
-import { SmardApiError, SmardError, SmardParseError, SmardValidationError, cutText, toWellFormed } from "../src/errors.js";
+import {
+  SmardApiError,
+  SmardError,
+  SmardNetworkError,
+  SmardParseError,
+  SmardResponseTooLargeError,
+  SmardValidationError,
+  cutText,
+  toWellFormed,
+} from "../src/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
 
 // Control characters built via char codes so no raw control bytes ever appear in
@@ -134,6 +143,47 @@ test("getJson decodes a body by its declared charset, drops a BOM, rejects an un
     () => new RequestEngine({ transport: unknown.transport }).getJson("/x"),
     (e: unknown) => e instanceof SmardParseError && /Unsupported response charset "x-nonsense"/.test(e.message),
   );
+});
+
+test("a timeout, the size cap, a refused connection and a DNS failure name the request", async () => {
+  const url = "https://www.smard.de/app/chart_data/410/DE/index_hour.json";
+  const path = "/app/chart_data/410/DE/index_hour.json";
+  const coded = (message: string, code: string) => Object.assign(new Error(message), { code });
+  const cases: Array<[string, () => Promise<never> | never, string]> = [
+    ["refused", () => { throw new SmardNetworkError("connect ECONNREFUSED 127.0.0.1:1", { cause: coded("connect ECONNREFUSED 127.0.0.1:1", "ECONNREFUSED") }); }, "connect ECONNREFUSED 127.0.0.1:1"],
+    ["dns", () => { throw coded("getaddrinfo ENOTFOUND smard.invalid", "ENOTFOUND"); }, "getaddrinfo ENOTFOUND smard.invalid"],
+    ["string", () => { throw "plain string"; }, "plain string"],
+  ];
+  for (const [name, thrower, reason] of cases) {
+    const e = new RequestEngine({ transport: makeMockTransport(thrower).transport, maxRetries: 0 });
+    await assert.rejects(e.getJson(path), (err: unknown) => {
+      assert.ok(err instanceof SmardNetworkError, name);
+      assert.equal(err.message, `GET ${url} failed: ${reason}`, name);
+      assert.ok(err.cause !== undefined, name);
+      return true;
+    });
+  }
+  // the engine's own deadline
+  const slow = new RequestEngine({ transport: () => new Promise(() => {}), timeoutMs: 5 });
+  await assert.rejects(slow.getJson(path), (err: unknown) =>
+    err instanceof SmardNetworkError && err.message === `GET ${url} failed: Request timed out after 5ms` && err.cause instanceof SmardNetworkError);
+  // the size cap, checked by the engine on a custom transport's body: still a SmardResponseTooLargeError
+  const big = new RequestEngine({ transport: makeMockTransport(() => rawResponse("x".repeat(20), "application/json")).transport, maxResponseBytes: 10 });
+  await assert.rejects(big.getJson(path), (err: unknown) =>
+    err instanceof SmardResponseTooLargeError &&
+    err.message === `GET ${url} failed: Response exceeded the size limit of 10 bytes (maxResponseBytes; --max-response-bytes on the CLI)`);
+  // the default transport's own size-cap error keeps its class too
+  const capped = new RequestEngine({ transport: () => Promise.reject(new SmardResponseTooLargeError("Response exceeded the size limit of 10 bytes")) });
+  await assert.rejects(capped.getJson(path), (err: unknown) =>
+    err instanceof SmardResponseTooLargeError && err.message === `GET ${url} failed: Response exceeded the size limit of 10 bytes`);
+  // userinfo is redacted in the named URL
+  const mirror = new RequestEngine({
+    baseUrl: "https://user:s3cret-pw@mirror.example",
+    transport: makeMockTransport(() => { throw coded("connect ECONNREFUSED 10.0.0.1:443", "ECONNREFUSED"); }).transport,
+  });
+  await assert.rejects(mirror.getJson(path), (err: unknown) =>
+    err instanceof SmardNetworkError &&
+    err.message === `GET https://***@mirror.example${path} failed: connect ECONNREFUSED 10.0.0.1:443` && !err.message.includes("s3cret"));
 });
 
 test("a 503 is retried up to maxRetries then surfaces as SmardApiError", async () => {

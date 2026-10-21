@@ -465,17 +465,23 @@ export class RequestEngine {
    * What the transport threw, as the error the engine raises. The default transport
    * rejects with `SmardNetworkError` only; an injected one may throw anything (a string, a
    * `TypeError` from fetch). Every failure becomes a `SmardNetworkError` — a `SmardError` a
-   * caller and the CLI can rely on — with the base URL's credentials scrubbed from its
-   * message and cause chain; any other `SmardError` passes through, and a clean
-   * `SmardNetworkError` stays as it is.
+   * caller and the CLI can rely on — that names the request, `<METHOD> <url> failed:
+   * <reason>` (userinfo redacted; Node's "connect ECONNREFUSED" or "Request timed out"
+   * says nothing about which call failed), with the original as `cause` and the base URL's
+   * credentials scrubbed from the message and the cause chain. A size-cap error stays a
+   * `SmardResponseTooLargeError`; any other `SmardError` passes through.
    */
-  private transportError(cause: unknown): SmardError {
+  private transportError(method: string, url: string, cause: unknown): SmardError {
     if (cause instanceof SmardError && !(cause instanceof SmardNetworkError)) return cause;
     const reason = cause instanceof Error ? cause.message : String(cause);
-    const message = sanitizeServerText(this.scrub(reason));
-    const scrubbed = this.scrubCause(cause);
-    if (cause instanceof SmardNetworkError && message === cause.message && scrubbed === cause) return cause;
-    return new SmardNetworkError(message, { cause: scrubbed });
+    const message = `${this.requestLabel(method, url)} failed: ${sanitizeServerText(this.scrub(reason))}`;
+    const NetworkError = cause instanceof SmardResponseTooLargeError ? SmardResponseTooLargeError : SmardNetworkError;
+    return new NetworkError(message, { cause: this.scrubCause(cause) });
+  }
+
+  /** `<METHOD> <url>` for a message: userinfo redacted, the URL cut at MAX_MESSAGE_VALUE_LENGTH. */
+  private requestLabel(method: string, url: string): string {
+    return `${method} ${cutForMessage(redactUrl(url))}`;
   }
 
   /**
@@ -564,7 +570,7 @@ export class RequestEngine {
           await this.backOff(attempt, this.retryDelayMs * attempt, url);
           continue;
         }
-        throw this.transportError(cause);
+        throw this.transportError(method, url, cause);
       }
 
       // An injected transport may resolve with anything; a malformed HttpResponse would
@@ -580,7 +586,7 @@ export class RequestEngine {
       // The size cap holds whatever the transport did: the default one aborts early, a custom
       // one may have read everything.
       if (this.maxResponseBytes > 0 && body.byteLength > this.maxResponseBytes) {
-        throw new SmardResponseTooLargeError(sizeLimitMessage(this.maxResponseBytes));
+        throw new SmardResponseTooLargeError(`${this.requestLabel(method, url)} failed: ${sizeLimitMessage(this.maxResponseBytes)}`);
       }
       const retryable = status === 429 || status === 503;
       // A Retry-After beyond MAX_RETRY_AFTER_MS is not retried: the error below surfaces at

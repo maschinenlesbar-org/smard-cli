@@ -193,8 +193,9 @@ its stderr reader has gone away (`2>&1 | true`).
   <filter> <region> <resolution>` — old windows stay available, so a timestamp
   from that list keeps working — and check the combination with `smard regions`
   and `smard filters`. For `table`, see the `table_data` note above.
-- **Exit `1` / network error** — connectivity, DNS, or a timeout. Try again,
-  or raise the limit with `--timeout 60000`.
+- **Exit `1` / network error** — connectivity, DNS, or a timeout. The ERROR record of
+  `smard.http` names the request (`GET https://www.smard.de/app/… failed: Request timed
+  out after 30000ms`). Try again, or raise the limit with `--timeout 60000`.
 - **Exit `1` with "Unexpected response shape" or "Malformed data file"** — the
   index was not `{"timestamps": [...]}`, or a data file was not `{"meta_data": {…},
   "series": [[timestamp, number or null], …]}` (an error page from a proxy, or a

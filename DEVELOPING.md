@@ -339,8 +339,11 @@ failure/timeout), `SmardResponseTooLargeError` (size-cap breach, a subclass of
 input the library rejects before any request), all extending `SmardError`. The
 CLI maps a `404` to exit code `4`, every other error to `1` — a
 `SmardValidationError` included, which is the CLI's usage exit code.
-Whatever a custom transport throws (a `TypeError` from `fetch`, an `AbortError`, a
-string) reaches the caller as a `SmardNetworkError` with the original as `cause`.
+Whatever a transport throws (a `TypeError` from `fetch`, an `AbortError`, a string,
+the default transport's refused connection or DNS failure) and the engine's own deadline
+reach the caller as a `SmardNetworkError` that names the request, `<METHOD> <url>
+failed: <reason>` (userinfo redacted), with the original as `cause`; the size cap, from
+either side, reads the same way and stays a `SmardResponseTooLargeError`.
 The base URL lives in a real `#private` field of the engine, so `console.log`,
 `util.inspect` and `JSON.stringify` of a client never show its password, and the
 engine scrubs the base URL's userinfo (raw and percent-decoded) from error bodies,
