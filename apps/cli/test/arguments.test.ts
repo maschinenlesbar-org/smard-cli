@@ -55,6 +55,8 @@ test("a repeated single-value option is a usage error, never last-one-wins", asy
     ["--user-agent", "a", "--user-agent", "b", "timestamps", "410", "DE", "hour"],
     ["--max-response-bytes", "1", "--max-response-bytes", "2", "timestamps", "410", "DE", "hour"],
     ["filters", "--group", "price", "--group", "generation"],
+    ["--log-format", "jsonl", "--log-format", "text", "timestamps", "410", "DE", "hour"],
+    ["--log-format=text", "timestamps", "410", "DE", "hour", "--log-format", "jsonl"],
   ];
   for (const argv of argvs) {
     const mt = makeMockTransport(responder);
