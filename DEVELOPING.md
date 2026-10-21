@@ -489,7 +489,11 @@ everything that drives the CLI is in `apps/cli/test/`.
   environment variable), P5 the engine-enforced transport contract, P6 the retry policy, P7
   closed pipes (spawns the built bin), P8/P9/P13 charset, response shapes and validation
   errors, P20 the stderr warning for a plain-`http:` base URL, P23 the log on stderr (its
-  body takes the usage-error exit code from the adapter's `USAGE_EXIT`, `1` here).
+  body takes the usage-error exit code from the adapter's `USAGE_EXIT`, `1` here), P24 the
+  input corpus (no text filter, so `textInputs` is empty; the filter, region, resolution and
+  timestamp path segments are refused alike by the CLI and the library), P25 the response
+  corpus (a data file's value: a number JSON can't carry exactly or an empty answer is an
+  error, exit 1). P26 (`-o` integrity) is not here: smard writes no files.
 
 ## Continuous integration
 
