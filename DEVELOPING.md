@@ -93,8 +93,8 @@ omitted option does: a consumer compiled with `exactOptionalPropertyTypes` can w
 `client.timestamps(filter, region, resolution)`, `client.series(filter, region, resolution, timestamp)`,
 `client.latest(filter, region, resolution)`, `client.tableData(filter, region, timestamp)`.
 The `FILTERS` array and the `RegionValues` / `ResolutionValues` / `FilterGroupValues` enums are
-exported for reference; `filtersByGroup(group?)` returns the catalogue or one group of it (what
-`smard filters --group` prints) and throws `SmardValidationError` for an unknown group instead of
+exported for reference; `filtersByGroup(group?)` returns the catalogue or one group of it as a
+new array, so sorting it leaves `FILTERS` as it is (what `smard filters --group` prints) and throws `SmardValidationError` for an unknown group instead of
 returning an empty list.
 
 > **Input checks.** Every `SmardClient` method checks its arguments before any

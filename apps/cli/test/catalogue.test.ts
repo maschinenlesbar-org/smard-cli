@@ -73,3 +73,14 @@ test("parity: filters --group gives the same result as filtersByGroup()", async 
     }
   }
 });
+
+test("filtersByGroup() hands out a copy: sorting the result never reorders the catalogue", () => {
+  const first = FILTERS[0];
+  const all = filtersByGroup();
+  assert.notEqual(all, FILTERS);
+  all.sort((a, b) => a.label.localeCompare(b.label));
+  all.push({ ...first!, id: -1 });
+  assert.equal(FILTERS[0], first);
+  assert.equal(filtersByGroup()[0], first);
+  assert.ok(!filtersByGroup().some((f) => f.id === -1));
+});
