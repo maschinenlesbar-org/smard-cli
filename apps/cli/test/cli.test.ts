@@ -531,3 +531,29 @@ test("a refused option value is echoed with its invisible characters escaped, ne
   await run(["--timeout", "5​000", "regions"], cli.deps);
   assert.match(untimed(cli.err[0]!), /^ERROR \[smard\.cli\] option '--timeout <ms>' argument '5\\u200b000' is invalid\. "5\\u200b000" contains an invisible or control character \(U\+200B\)\.$/);
 });
+
+test("a URL with a password anywhere in an argument is redacted on stderr: padded, mid-phrase, dash-led, encoded (T15)", async () => {
+  const url = "https://bob:s3cretpw@mirror.example/x";
+  const cases: string[][] = [];
+  for (const value of [` ${url}`, `\t${url}`, `x ${url} y`, ` -${url}`, `DE${url}`, encodeURIComponent(` ${url}`)]) {
+    cases.push(
+      ["timestamps", "410", value, "hour"], // the library's refusal of a region quotes it
+      ["timestamps", value, "DE", "hour"], // the refusal of a filter id
+      ["filters", "--group", value], // the catalogue's refusal of a group
+      ["--timeout", value, "regions"], // commander's echo of a rejected value
+      [value], // an unknown command
+      ["regions", value], // a stray argument
+    );
+  }
+  for (const argv of cases) {
+    for (const format of [[], ["--log-format", "jsonl"]]) {
+      const cli = makeCli(() => jsonResponse({ timestamps: [] }));
+      const code = await run([...format, ...argv], cli.deps);
+      const err = cli.err.join("\n");
+      assert.notEqual(code, 0, argv.join(" "));
+      assert.ok(err !== "", argv.join(" "));
+      assert.ok(!err.includes("s3cretpw") && !err.includes("bob:"), `${JSON.stringify(argv)}: ${err}`);
+      assert.equal(cli.mt.calls.length, 0, argv.join(" "));
+    }
+  }
+});
