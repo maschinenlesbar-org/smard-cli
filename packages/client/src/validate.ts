@@ -219,10 +219,15 @@ export const nonNegativeIntegerProblem: Problem<unknown> = (value) => {
   if (typeof value === "string" || typeof value === "bigint") {
     return `Expected a non-negative integer as a number, not a ${typeof value} (convert it with Number()).`;
   }
-  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
-    ? undefined
-    : "Expected a non-negative integer.";
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return undefined;
+  // An integer past 2^53 (a digit string the CLI read as one) is a non-negative integer, just
+  // not one a double holds exactly: name the range, not a contradiction.
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) return SAFE_RANGE;
+  return "Expected a non-negative integer.";
 };
+
+/** The reason for an integer past 2^53: the range a filter id, a timestamp or a byte count may take. */
+const SAFE_RANGE = `Expected an integer from 0 to ${Number.MAX_SAFE_INTEGER}.`;
 
 /** The rule for a region: one of `RegionValues` (case-sensitive, no padding). */
 export const regionProblem = oneOfProblem(RegionValues);

@@ -36,7 +36,7 @@ test("the engine rejects out-of-range numeric options at construction", () => {
     ["maxResponseBytes", -1, "Expected a non-negative integer."],
     ["maxResponseBytes", NaN, "Expected a non-negative integer."],
     ["maxResponseBytes", 1.5, "Expected a non-negative integer."],
-    ["maxResponseBytes", 1e20, "Expected a non-negative integer."],
+    ["maxResponseBytes", 1e20, "Expected an integer from 0 to 9007199254740991."],
     ["retryDelayMs", -1, "Expected an integer from 0 to 30000."],
     ["retryDelayMs", Infinity, "Expected an integer from 0 to 30000."],
     ["retryDelayMs", 30_001, "Expected an integer from 0 to 30000."],

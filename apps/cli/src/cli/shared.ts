@@ -56,7 +56,9 @@ export function parseIntArg(value: string): number {
   assertToken(value);
   const n = parseNonNegativeInt(value);
   if (n === null) {
-    throw new InvalidArgumentError("Expected a non-negative integer.");
+    // A digit string too large to hold exactly is out of range, not "no integer": the
+    // library's rule names the range.
+    throw new InvalidArgumentError(/^\d+$/.test(value) ? (nonNegativeIntegerProblem(Number(value)) ?? "") : "Expected a non-negative integer.");
   }
   return n;
 }
@@ -64,6 +66,8 @@ export function parseIntArg(value: string): number {
 /** Build a commander value-parser for a non-negative integer constrained to [min, max]. */
 export function parseBoundedInt(min: number, max: number): (value: string) => number {
   return (value: string) => {
+    // A digit string past 2^53 is past `max` too: say so, as for any other value above it.
+    if (/^\d+$/.test(value) && !Number.isSafeInteger(Number(value))) throw new InvalidArgumentError(`Must be <= ${max}.`);
     const n = parseIntArg(value);
     if (n < min) throw new InvalidArgumentError(`Must be >= ${min}.`);
     if (n > max) throw new InvalidArgumentError(`Must be <= ${max}.`);

@@ -20,7 +20,7 @@ test("requireInt does not turn a huge value into exponent form", () => {
   // "1e21" must be rejected outright, not coerced into the URL as "1e+21".
   assert.throws(() => requireInt("1e21", "timestamp"), SmardError);
   // A value beyond MAX_SAFE_INTEGER is rejected rather than silently rounded.
-  assert.throws(() => requireInt("9999999999999999999999", "timestamp"), /too large|non-negative integer/);
+  assert.throws(() => requireInt("9999999999999999999999", "timestamp"), /Expected an integer from 0 to 9007199254740991\./);
 });
 
 test("parseIntArg mirrors requireInt but throws InvalidArgumentError", () => {

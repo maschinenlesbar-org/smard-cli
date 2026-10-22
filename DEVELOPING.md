@@ -100,7 +100,9 @@ returning an empty list.
 > **Input checks.** Every `SmardClient` method checks its arguments before any
 > request: `filter` and `timestamp` must be non-negative safe integers (so `-1`,
 > `1.5`, `NaN`, `Infinity`, a string or an integer beyond `Number.MAX_SAFE_INTEGER`,
-> which would be rounded to another file, are refused), `region` must be one of
+> which would be rounded to another file, are refused; past 2^53 the reason names the
+> range, `Expected an integer from 0 to 9007199254740991.`, also for a digit string the
+> CLI reads, and an integer option past 2^53 is `Must be <= <max>.`), `region` must be one of
 > `RegionValues` and `resolution` one of `ResolutionValues` (exact case). A region, a
 > resolution and a filter group are tokens (`tokenProblem`, `normalizeToken`, D8 of the
 > 2026-10-21 fix plan): surrounding whitespace is trimmed and the value sent in composed

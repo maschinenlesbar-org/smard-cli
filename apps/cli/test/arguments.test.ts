@@ -24,8 +24,12 @@ test("nonNegativeIntegerProblem accepts only non-negative safe integers", () => 
   for (const ok of [0, 1, 410, 1700000000000, Number.MAX_SAFE_INTEGER]) {
     assert.equal(nonNegativeIntegerProblem(ok), undefined, String(ok));
   }
-  for (const bad of [-1, 1.5, NaN, Infinity, -Infinity, 2 ** 53, 1e21, null, undefined]) {
+  for (const bad of [-1, 1.5, NaN, Infinity, -Infinity, -(2 ** 53), null, undefined]) {
     assert.equal(nonNegativeIntegerProblem(bad), "Expected a non-negative integer.", String(bad));
+  }
+  // An integer past 2^53 is out of range: the reason names the range.
+  for (const bad of [2 ** 53, 1e21]) {
+    assert.equal(nonNegativeIntegerProblem(bad), "Expected an integer from 0 to 9007199254740991.", String(bad));
   }
   // A numeric string or a bigint looks like a valid id: the reason says what is wrong.
   for (const [bad, type] of [["410", "string"], ["", "string"], [410n, "bigint"]] as const) {
@@ -198,4 +202,31 @@ test("echoed values and server text are cut at 500 characters; null options mean
   const client = new SmardClient({ transport: makeMockTransport(() => jsonResponse({ detail }, 500)).transport, maxRetries: 0 });
   await assert.rejects(client.timestamps(410, "DE", "hour"), (e: unknown) => e instanceof Error && e.message.length < 700);
   assert.doesNotThrow(() => new SmardClient(null as unknown as undefined));
+});
+
+test("a digit string too large to hold exactly is refused for its range, not as 'not a non-negative integer'", async () => {
+  const SAFE = "Expected an integer from 0 to 9007199254740991.";
+  for (const [argv, record] of [
+    [["--timeout", "99999999999999999999", "regions"], "option '--timeout <ms>' argument '99999999999999999999' is invalid. Must be <= 2147483647."],
+    [["--max-retries", "9007199254740993", "regions"], "option '--max-retries <n>' argument '9007199254740993' is invalid. Must be <= 10."],
+    [["--max-response-bytes", "9007199254740992", "regions"], `option '--max-response-bytes <n>' argument '9007199254740992' is invalid. ${SAFE}`],
+    [["series", "410", "DE", "hour", "9007199254740993"], `Invalid timestamp "9007199254740993". ${SAFE}`],
+    [["series", "99999999999999999999", "DE", "hour", "1700000000000"], `Invalid filter "99999999999999999999". ${SAFE}`],
+  ] as const) {
+    const mt = makeMockTransport(responder);
+    const err: string[] = [];
+    const code = await run([...argv], {
+      io: { out: () => {}, err: (s) => err.push(s) },
+      createClient: (opts) => new SmardClient({ ...opts, transport: mt.transport }),
+    });
+    assert.equal(code, 1, argv.join(" "));
+    // commander shows the help after its own error (INFO records); the error is the one ERROR.
+    assert.deepEqual(err.map(untimed).filter((line) => line.startsWith("ERROR")), [`ERROR [smard.cli] ${record}`], argv.join(" "));
+    assert.equal(mt.calls.length, 0);
+  }
+  // The library names the range for an integer past 2^53 too; -1 and 1.5 keep their reason.
+  const c = new SmardClient({ transport: makeMockTransport(responder).transport });
+  await assert.rejects(c.timestamps(2 ** 60, "DE", "hour"), { message: `Invalid filter "${2 ** 60}". ${SAFE}` });
+  await assert.rejects(c.timestamps(-1, "DE", "hour"), { message: 'Invalid filter "-1". Expected a non-negative integer.' });
+  await assert.rejects(c.timestamps(1.5, "DE", "hour"), { message: 'Invalid filter "1.5". Expected a non-negative integer.' });
 });
