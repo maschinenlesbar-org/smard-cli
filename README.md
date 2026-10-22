@@ -132,8 +132,9 @@ Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `W
 `INFO`) and a topic, the program and the area it comes from (`smard.cli` for usage
 errors, `smard.api` for the API's answers, a malformed answer included, `smard.http`
 for the connection,
-`smard.output` for a failed write to stdout, or an answer nested too deeply to
-pretty-print, which suggests `--compact`). By default
+`smard.output` for a failed write to stdout, or an answer too deeply nested or too large
+to print, which names the cause and suggests `--compact` only where `--compact` prints
+that answer). By default
 it is written log4j style; `--log-format jsonl` writes one JSON object per line instead.
 A record is always one line: a line break, a control character or a bidi control in a
 message (a server's text, a value you typed) is written as an escape (`\n`, `\u001b`,
