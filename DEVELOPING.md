@@ -78,6 +78,11 @@ Text is never changed silently either: bytes that aren't valid in the answer's c
 surrogates written as JSON escapes (`\ud800`) become U+FFFD (the result is well-formed, so `jq`
 reads the CLI's output), and `onWarning` gets one message naming the count and the request; the
 CLI logs it as a `WARN` record of `smard.api`. One bad character never sinks a whole answer.
+A body too large to become one string (512 MB and more, possible only with
+`maxResponseBytes: 0` or `--max-response-bytes 0`) is a `SmardParseError`, `GET <url>: the
+answer is too large to read as text (N bytes; the longest string is 536870888 characters).`,
+not a plain `Error` ("Unexpected error" in the CLI); an error status with such a body keeps its
+`SmardApiError`, without the body.
 
 Every option is declared `?: T | undefined`, and `undefined` means the default, as an
 omitted option does: a consumer compiled with `exactOptionalPropertyTypes` can write
