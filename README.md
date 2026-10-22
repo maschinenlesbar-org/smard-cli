@@ -132,7 +132,7 @@ Each line on stderr is a **log record**: a timestamp (UTC), a level (`ERROR`, `W
 `INFO`) and a topic, the program and the area it comes from (`smard.cli` for usage
 errors, `smard.api` for the API's answers, a malformed answer included, `smard.http`
 for the connection,
-`smard.output` for a failed write to stdout, or an answer too deeply nested or too large
+`smard.output` for a failed or cut-short write to stdout, or an answer too deeply nested or too large
 to print, which names the cause and suggests `--compact` only where `--compact` prints
 that answer). An error about an answer names the request (`GET <url>: the answer is not
 valid JSON`). Text in an answer is never changed silently: bytes that are not valid in its

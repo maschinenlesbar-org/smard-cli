@@ -476,7 +476,7 @@ and a message longer than `MAX_RECORD_MESSAGE` (4000 characters, exported) is cu
 code point and ends in `… (N more characters)`. The areas are `cli` (usage errors, commander's messages, unexpected errors, the
 library's validation errors), `api` (the API's answers: an HTTP error status, and a
 malformed answer — a `SmardParseError`: bad JSON, an unknown charset, a 2xx body without
-the documented shape, an index element that is no timestamp), `http` (the connection, the cleartext warning) and `output` (a failed write to stdout, and
+the documented shape, an index element that is no timestamp), `http` (the connection, the cleartext warning) and `output` (a failed or cut-short write to stdout, and
 an answer it can't print — an `OutputError` from `renderJson`, exit 1, naming the cause:
 "nested too deeply" for a stack overflow, "too large" for a text past V8's longest string
 (2^29 − 24 characters); "try --compact" is added only when the compact form of that very
@@ -504,7 +504,10 @@ holds a record while stdout still has data queued and writes it, in order, once 
 out, so with `2>&1 |` and a slow reader a record never lands inside the JSON. A failed
 write to stdout other than a closed pipe
 (`handleOutputErrors`, in the bin shim, outside `run()`) is an ERROR record of
-`smard.output` (`Could not write to stdout: …`), in the format argv asks for and redacted
+`smard.output` (`Could not write to stdout: …`) — also a write cut short when stdout is a
+regular file (`> out.json` under a file-size limit or on a full disk: EFBIG, ENOSPC), which
+`stdoutWriter` (`io.ts`) writes with `writeAll` and reports as stdout's `error`, where Node's
+stream ignored the short count and exited 0 —, in the format argv asks for and redacted
 like the run's log (`processLogger`). So are Node's own process warnings
 (`installWarningLog`, also installed by the shim): a WARN record of `smard.cli`,
 `(node) <name>: <message>`, instead of Node's plain `(node:PID) Warning: …` line (e.g.
@@ -554,7 +557,9 @@ everything that drives the CLI is in `apps/cli/test/`.
   error, exit 1; a subnormal that prints changed too; the error names the request), P27 big
   and odd answers (a large flat answer and one of DEL characters print within a small heap,
   or are "too large" past V8's longest string; a lone surrogate or invalid bytes become U+FFFD
-  with a `WARN` record of `smard.api`). P26 (`-o` integrity) is not here: smard writes no files.
+  with a `WARN` record of `smard.api`), P26 output integrity (stdout redirected to a file and
+  cut short is an `ERROR` record of `smard.output`, exit 1; its `-o` tests are skipped,
+  `HAS_OUTPUT_OPTION = false`: smard writes no files).
 
 ## Continuous integration
 

@@ -220,7 +220,7 @@ valid resolution values — served locally from the bundled enums, no network ca
 commander's messages, unexpected errors), `api` (the API's answers: an error status such
 as the `404` for a window without data, and a malformed answer — not JSON, the wrong
 shape, an unknown charset, a number JSON can't carry exactly), `http` (the connection, the cleartext warning, and one WARN per retry before it waits) and `output`
-(a failed write to stdout, or an answer too deeply nested or too large to print; the
+(a failed or cut-short write to stdout, or an answer too deeply nested or too large to print; the
 record names the cause and suggests `--compact` only where that prints the answer). A record is always one line; control characters in it are
 escaped.
 
