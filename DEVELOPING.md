@@ -62,8 +62,17 @@ new SmardClient({
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",    // a header value: no control characters, nothing above U+00FF
   transport: customTransport, // inject your own HTTP transport
+  bigIntegerKeys: new Set(["_version_"]), // members whose numbers may pass 2^53: delivered as strings
 });
 ```
+
+**Exact answers.** A number a double can't carry exactly is a `SmardParseError`, never a
+changed value (see "Input checks" below). A member named in `bigIntegerKeys` (a set or list of
+non-empty member names, copied; default none, and SMARD needs none: its values are decimals and
+its timestamps epoch milliseconds) is the one exception: its number value is delivered as its
+exact literal, as written, as a JSON string (`"1858054135406919680"`, `"5"`), whatever its size,
+so its type is stable. The engine does both in one linear scan of the text before `JSON.parse`
+(`scanNumbers`, which quotes the declared values in place; no reviver).
 
 Every option is declared `?: T | undefined`, and `undefined` means the default, as an
 omitted option does: a consumer compiled with `exactOptionalPropertyTypes` can write
