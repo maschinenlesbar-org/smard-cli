@@ -21,7 +21,7 @@
 import { RequestEngine, type EngineOptions } from "./engine.js";
 import type { Region, Resolution } from "./enums.js";
 import type { SeriesResult, TableResult } from "./types.js";
-import { SmardError, SmardParseError } from "./errors.js";
+import { SmardParseError } from "./errors.js";
 import { assertId, assertRegion, assertResolution } from "./validate.js";
 
 /**
@@ -32,6 +32,11 @@ import { assertId, assertRegion, assertResolution } from "./validate.js";
  * leaves unchanged, is also refused by the engine's `buildUrl`.
  */
 const enc = (value: string | number): string => encodeURIComponent(String(value));
+
+/** The path of the index of a (filter, region, resolution); the arguments are checked by the caller. */
+function indexPath(filter: number, region: Region, resolution: Resolution): string {
+  return `/app/chart_data/${enc(filter)}/${enc(region)}/index_${enc(resolution)}.json`;
+}
 
 /** A non-null, non-array JSON object. */
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -113,7 +118,7 @@ export class SmardClient {
     assertId("filter", filter);
     assertRegion(region);
     assertResolution(resolution);
-    const path = `/app/chart_data/${enc(filter)}/${enc(region)}/index_${enc(resolution)}.json`;
+    const path = indexPath(filter, region, resolution);
     const res = await this.engine.getJson<unknown>(path);
     const request = `GET ${this.engine.describeUrl(path)}`;
     // SMARD answers a (filter, region, resolution) without data with a 404, never
@@ -161,9 +166,11 @@ export class SmardClient {
   async latest(filter: number, region: Region, resolution: Resolution): Promise<SeriesResult> {
     const ts = await this.timestamps(filter, region, resolution);
     if (ts.length === 0) {
-      // Never invent a result: there is no newest window to fetch.
-      throw new SmardError(
-        `The index for filter ${filter}, region ${region}, resolution ${resolution} lists no windows, so there is no newest window to fetch.`,
+      // Never invent a result: there is no newest window to fetch. SMARD answers a series
+      // without data with a 404, so an empty index is a broken answer: the answer's error
+      // (SmardParseError, the CLI's smard.api), naming the index request.
+      throw new SmardParseError(
+        `GET ${this.engine.describeUrl(indexPath(filter, region, resolution))}: the index lists no windows, so there is no newest window to fetch.`,
       );
     }
     // Take the genuinely newest timestamp rather than trusting the index order.

@@ -232,12 +232,14 @@ test("a malformed index body exits 1 with a parse error, never [] or an invented
   }
 });
 
-test("latest on an empty index exits 1 and prints nothing on stdout", async () => {
+test("latest on an empty index exits 1, an ERROR of smard.api naming the index, nothing on stdout", async () => {
   const cli = makeCli(() => jsonResponse({ timestamps: [] }));
   const code = await run(["latest", "410", "DE", "hour"], cli.deps);
   assert.equal(code, 1);
   assert.deepEqual(cli.out, []);
-  assert.match(cli.err.join("\n"), /lists no windows/);
+  assert.deepEqual(cli.err.map(untimed), [
+    "ERROR [smard.api] GET https://www.smard.de/app/chart_data/410/DE/index_hour.json: the index lists no windows, so there is no newest window to fetch.",
+  ]);
   assert.equal(cli.mt.calls.length, 1);
 });
 

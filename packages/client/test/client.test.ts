@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SmardClient } from "../src/client.js";
-import { SmardApiError, SmardError, SmardParseError, SmardValidationError } from "../src/errors.js";
+import { SmardApiError, SmardParseError, SmardValidationError } from "../src/errors.js";
 import { makeMockTransport, jsonResponse, constantJson } from "./helpers.js";
 
 function clientWith(mt: ReturnType<typeof makeMockTransport>): SmardClient {
@@ -45,15 +45,14 @@ test("timestamps passes an empty index through as []", async () => {
   assert.deepEqual(await clientWith(mt).timestamps(410, "DE", "hour"), []);
 });
 
-test("latest on an empty index throws instead of inventing a result", async () => {
+test("latest on an empty index is the answer's error (SmardParseError naming the request), never an invented result", async () => {
   const mt = constantJson({ timestamps: [] });
   await assert.rejects(
     () => clientWith(mt).latest(410, "DE", "hour"),
     (err: unknown) =>
-      err instanceof SmardError &&
-      !(err instanceof SmardParseError) &&
+      err instanceof SmardParseError &&
       err.message ===
-        "The index for filter 410, region DE, resolution hour lists no windows, so there is no newest window to fetch.",
+        "GET https://www.smard.de/app/chart_data/410/DE/index_hour.json: the index lists no windows, so there is no newest window to fetch.",
   );
   assert.equal(mt.calls.length, 1); // never fetched a data file
 });

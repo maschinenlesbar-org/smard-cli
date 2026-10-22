@@ -115,8 +115,9 @@ returning an empty list.
 >   [{"timestamp": epochMs, "versions": [{"value": number|null, …}]}]}]}`; extra keys
 >   (a version's `info`) are kept.
 >
-> `latest()` on an index that lists no windows throws a `SmardError` rather than
-> returning a made-up empty result.
+> `latest()` on an index that lists no windows throws a `SmardParseError` rather than
+> returning a made-up empty result (`GET <url of the index>: the index lists no windows, so
+> there is no newest window to fetch.`; CLI exit 1, an ERROR record of `smard.api`).
 >
 > Before any shape check, `getJson` refuses a body with a number `JSON.parse` can't
 > carry exactly (`firstInexactNumber`): one out of a double's range (`1e400` would

@@ -203,7 +203,8 @@ its stderr reader has gone away (`2>&1 | true`).
   response shape: …`). The index was not `{"timestamps": [...]}`, or a data file was not `{"meta_data": {…},
   "series": [[timestamp, number or null], …]}` (an error page from a proxy, or a
   changed format), so the CLI refuses to print it as data or read it as "no data".
-  `latest` also exits `1` if an index lists no windows at all.
+  `latest` also exits `1` if an index lists no windows at all (`… index_hour.json: the
+  index lists no windows …`).
 - **Exit `1` with "the number … cannot be represented exactly"** — the answer held a
   number JSON can't carry exactly (past 2^53, out of a double's range, too small
   for one, or a subnormal such as `3e-324` that a double would turn into `5e-324`), so
