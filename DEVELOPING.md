@@ -101,12 +101,25 @@ returning an empty list.
 > request: `filter` and `timestamp` must be non-negative safe integers (so `-1`,
 > `1.5`, `NaN`, `Infinity`, a string or an integer beyond `Number.MAX_SAFE_INTEGER`,
 > which would be rounded to another file, are refused), `region` must be one of
-> `RegionValues` and `resolution` one of `ResolutionValues` (exact case, no padding).
+> `RegionValues` and `resolution` one of `ResolutionValues` (exact case). A region, a
+> resolution and a filter group are tokens (`tokenProblem`, `normalizeToken`, D8 of the
+> 2026-10-21 fix plan): surrounding whitespace is trimmed and the value sent in composed
+> Unicode (NFC), so `" DE "` requests `DE`; a blank value (or one of only invisible
+> characters or combining marks), a lone surrogate and any control or format character (a
+> zero-width space, a soft hyphen, a bidi control) are refused, the reason naming the
+> character. The digits of a filter id or timestamp the CLI parses are refused the same way
+> before "not a number". Every refused value is quoted visibly (`quoteValue`: `"D\u200bE"`,
+> cut at 500 characters with the "…" after the quote).
 > A bad argument rejects with `SmardValidationError` — the same message the CLI
-> prints, e.g. `Invalid region "de". Expected one of: DE, AT, …` — and sends no
+> prints, e.g. `Invalid region "de". Expected one of: DE, AT, …` or `Invalid region:
+> "D\u200bE" contains an invisible or control character (U+200B).` — and sends no
 > request, so a typo is never mistaken for SMARD's "no data" 404. The rules are
 > exported (`nonNegativeIntegerProblem`, `regionProblem`, `resolutionProblem`,
-> `assertId`, `assertRegion`, `assertResolution`) and the CLI calls the same ones.
+> `assertId`, `assertRegion`, `assertResolution`, `tokenProblem`, `normalizeToken`, and
+> the kit's `textProblem`, `normalizeText`, `splitList` and `listProblem`, which no method
+> needs: SMARD takes no free text and no list) and the CLI calls the same ones.
+> Commander's own echo of a refused option value shows the same characters escaped
+> (`escapeCommanderError`, `run.ts`).
 > Every argument is still `encodeURIComponent`-escaped and the engine's `buildUrl`
 > refuses a `.` / `..` segment, as defence in depth.
 >

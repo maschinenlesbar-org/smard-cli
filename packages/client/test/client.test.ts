@@ -177,3 +177,23 @@ test("series, latest and tableData return a well-formed file and reject anything
     await assert.rejects(clientWith(constantJson(body)).tableData(410, "DE", 1000), SmardParseError, JSON.stringify(body));
   }
 });
+
+test("a region and a resolution are tokens: sent trimmed and NFC, case kept; an invisible character is refused visibly (D8, D10)", async () => {
+  const mt = constantJson({ timestamps: [1577836800000] });
+  await clientWith(mt).timestamps(410, " DE " as never, "hour\n" as never);
+  assert.equal(mt.last().url, "https://www.smard.de/app/chart_data/410/DE/index_hour.json");
+  const data = constantJson({ meta_data: {}, series: [] });
+  await clientWith(data).series(410, " DE-LU" as never, " quarterhour " as never, 1577836800000);
+  assert.equal(data.last().url, "https://www.smard.de/app/chart_data/410/DE-LU/410_DE-LU_quarterhour_1577836800000.json");
+  for (const [call, shown] of [
+    [(c: SmardClient) => c.timestamps(410, "D​E" as never, "hour"), 'Invalid region: "D\\u200bE" contains an invisible or control character (U+200B).'],
+    [(c: SmardClient) => c.timestamps(410, "DE", "ho­ur" as never), 'Invalid resolution: "ho\\u00adur" contains an invisible or control character (U+00AD).'],
+    [(c: SmardClient) => c.timestamps("4​10" as never, "DE", "hour"), 'Invalid filter: "4\\u200b10" contains an invisible or control character (U+200B).'],
+    [(c: SmardClient) => c.timestamps(410, "de" as never, "hour"), 'Invalid region "de". Expected one of: DE, AT, LU, DE-LU, DE-AT-LU, 50Hertz, Amprion, TenneT, TransnetBW, APG, Creos.'],
+    [(c: SmardClient) => c.timestamps(410, "​" as never, "hour"), "Invalid region: Expected a non-empty value."],
+  ] as const) {
+    const none = constantJson({});
+    await assert.rejects(call(clientWith(none)), (err: unknown) => err instanceof SmardValidationError && err.message === shown, shown);
+    assert.equal(none.calls.length, 0);
+  }
+});

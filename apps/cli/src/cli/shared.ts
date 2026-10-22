@@ -4,7 +4,7 @@
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
 import { logOf, type CliDeps } from "./io.js";
-import { assertArgument, headerValueProblem, nonNegativeIntegerProblem } from "@maschinenlesbar.org/smard-client/internal/validate";
+import { assertArgument, assertValid, headerValueProblem, nonNegativeIntegerProblem, tokenProblem } from "@maschinenlesbar.org/smard-client/internal/validate";
 import { DEFAULT_BASE_URL, baseUrlProblem, cleartextProblem, type EngineOptions, type RetryEvent } from "@maschinenlesbar.org/smard-client/internal/engine";
 
 /**
@@ -40,8 +40,20 @@ export function once<T>(flag: string, parse: (value: string) => T): (value: stri
   };
 }
 
+/**
+ * Refuse a value the library's token rule refuses ({@link tokenProblem}): blank (or only
+ * invisible characters), a lone surrogate, a control or format character. Every integer parser
+ * calls it first, so such a value is named, and shown escaped (`"5\u200b000" contains an
+ * invisible or control character (U+200B).`), instead of only "Expected a non-negative integer".
+ */
+function assertToken(value: string): void {
+  const problem = tokenProblem(value);
+  if (problem !== undefined) throw new InvalidArgumentError(problem);
+}
+
 /** commander value-parser: a non-negative integer. */
 export function parseIntArg(value: string): number {
+  assertToken(value);
   const n = parseNonNegativeInt(value);
   if (n === null) {
     throw new InvalidArgumentError("Expected a non-negative integer.");
@@ -100,6 +112,8 @@ export function parseBaseUrl(value: string): string {
  * a SmardValidationError echoing the raw value, which run() prints and exits 1 on.
  */
 export function requireInt(value: string, argName: string): number {
+  // An invisible or control character is named, shown escaped, before "not a number".
+  assertValid(argName, value, tokenProblem);
   const n = /^\d+$/.test(value) ? Number(value) : Number.NaN;
   return assertArgument<number>(argName, n, nonNegativeIntegerProblem, value);
 }

@@ -77,7 +77,7 @@ resolutions                                              valid resolution values
 | Argument | What it means |
 | --- | --- |
 | `<filter>` | Numeric series id — e.g. `410` (total grid load), `4068` (photovoltaics), `4169` (DE-LU wholesale price). Use `smard filters` to browse all documented ids. |
-| `<region>` | Grid or bidding-zone code — e.g. `DE`, `DE-LU`, `TenneT`. Use `smard regions` for the full list. |
+| `<region>` | Grid or bidding-zone code — e.g. `DE`, `DE-LU`, `TenneT`. Use `smard regions` for the full list. Case counts; surrounding whitespace is trimmed, an invisible character (a zero-width space) is a usage error, shown escaped (`\u200b`). |
 | `<resolution>` | Temporal granularity: `hour`, `quarterhour`, `day`, `week`, `month`, or `year`. Use `smard resolutions` to confirm. |
 | `<timestamp>` | Epoch-millisecond window start from `smard timestamps`. |
 

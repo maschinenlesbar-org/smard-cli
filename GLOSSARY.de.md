@@ -61,7 +61,9 @@ deshalb akzeptieren CLI und Client jede nicht-negative ganze Zahl; der mitgelief
 
 **Region.** Ein Code für ein Marktgebiet oder eine Netzregion. Siehe `smard regions`; die
 gültige Menge (`RegionValues`) ist `DE`, `AT`, `LU`, `DE-LU`, `DE-AT-LU`, `50Hertz`, `Amprion`,
-`TenneT`, `TransnetBW`, `APG`, `Creos`.
+`TenneT`, `TransnetBW`, `APG`, `Creos`. Groß- und Kleinschreibung zählt (`de` wird
+abgelehnt); Leerraum am Rand wird entfernt, ein unsichtbares Zeichen (ein Leerzeichen der
+Breite null) wird abgelehnt.
 
 **Auflösung (resolution).** Die zeitliche Granularität einer Reihe: einer der Werte `hour`,
 `quarterhour`, `day`, `week`, `month`, `year` (`ResolutionValues`). Siehe

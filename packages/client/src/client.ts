@@ -116,8 +116,8 @@ export class SmardClient {
   /** The timestamps (window starts) available for a (filter, region, resolution). */
   async timestamps(filter: number, region: Region, resolution: Resolution): Promise<number[]> {
     assertId("filter", filter);
-    assertRegion(region);
-    assertResolution(resolution);
+    region = assertRegion(region);
+    resolution = assertResolution(resolution);
     const path = indexPath(filter, region, resolution);
     const res = await this.engine.getJson<unknown>(path);
     const request = `GET ${this.engine.describeUrl(path)}`;
@@ -155,8 +155,8 @@ export class SmardClient {
     timestamp: number,
   ): Promise<SeriesResult> {
     assertId("filter", filter);
-    assertRegion(region);
-    assertResolution(resolution);
+    region = assertRegion(region);
+    resolution = assertResolution(resolution);
     assertId("timestamp", timestamp);
     const path = `/app/chart_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_${enc(resolution)}_${enc(timestamp)}.json`;
     return checkSeriesResult(await this.engine.getJson<unknown>(path), `GET ${this.engine.describeUrl(path)}`);
@@ -164,6 +164,9 @@ export class SmardClient {
 
   /** Convenience: fetch the newest available window's data in one call. */
   async latest(filter: number, region: Region, resolution: Resolution): Promise<SeriesResult> {
+    assertId("filter", filter);
+    region = assertRegion(region);
+    resolution = assertResolution(resolution);
     const ts = await this.timestamps(filter, region, resolution);
     if (ts.length === 0) {
       // Never invent a result: there is no newest window to fetch. SMARD answers a series
@@ -183,7 +186,7 @@ export class SmardClient {
   /** Quarter-hour `table_data` for one window (richer per-point versions). */
   async tableData(filter: number, region: Region, timestamp: number): Promise<TableResult> {
     assertId("filter", filter);
-    assertRegion(region);
+    region = assertRegion(region);
     assertId("timestamp", timestamp);
     const path = `/app/table_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_quarterhour_${enc(timestamp)}.json`;
     return checkTableResult(await this.engine.getJson<unknown>(path), `GET ${this.engine.describeUrl(path)}`);

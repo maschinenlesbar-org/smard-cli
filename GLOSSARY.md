@@ -62,7 +62,8 @@ the CLI and client accept any non-negative integer; the bundled `FILTERS` catalo
 
 **region.** A market or grid area code. See `smard regions`; the valid set
 (`RegionValues`) is `DE`, `AT`, `LU`, `DE-LU`, `DE-AT-LU`, `50Hertz`, `Amprion`,
-`TenneT`, `TransnetBW`, `APG`, `Creos`.
+`TenneT`, `TransnetBW`, `APG`, `Creos`. Case counts (`de` is refused); surrounding
+whitespace is trimmed, and an invisible character (a zero-width space) is refused.
 
 **resolution.** The temporal granularity of a series: one of `hour`,
 `quarterhour`, `day`, `week`, `month`, `year` (`ResolutionValues`). See

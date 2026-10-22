@@ -20,6 +20,12 @@ export {
   assertId,
   assertRegion,
   assertResolution,
+  tokenProblem,
+  normalizeToken,
+  textProblem,
+  normalizeText,
+  splitList,
+  listProblem,
 } from "./validate.js";
 export type { Problem } from "./validate.js";
 export {
@@ -37,6 +43,7 @@ export {
   cutForMessage,
   cutText,
   toWellFormed,
+  quoteValue,
   MAX_MESSAGE_VALUE_LENGTH,
 } from "./errors.js";
 

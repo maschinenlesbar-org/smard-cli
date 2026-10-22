@@ -511,3 +511,23 @@ test("a usage error found before any request logs no cleartext WARN (03-1)", asy
   assert.equal(await run(["--base-url", "http://mirror.example", "timestamps", "410", "DE", "hour"], sent.deps), 0);
   assert.equal(sent.err.filter((line) => line.includes("WARN  [smard.http]")).length, 1, sent.err.join("\n"));
 });
+
+test("a refused option value is echoed with its invisible characters escaped, never raw (D10)", async () => {
+  for (const argv of [
+    ["--timeout", "5​000", "regions"],
+    ["--max-retries", "‮1", "regions"],
+    ["--log-format", "te­xt", "regions"],
+    ["unknown​command"],
+  ]) {
+    const cli = makeCli(() => jsonResponse({}));
+    const code = await run(argv, cli.deps);
+    assert.equal(code, 1, argv.join(" "));
+    const err = cli.err.join("\n");
+    assert.ok(!/[​‮­]/.test(err), `${argv.join(" ")}: raw: ${err}`);
+    assert.match(err, /\\u(200b|202e|00ad)/, argv.join(" "));
+  }
+  // The integer parsers name the character (the library's tokenProblem), not only "not an integer".
+  const cli = makeCli(() => jsonResponse({}));
+  await run(["--timeout", "5​000", "regions"], cli.deps);
+  assert.match(untimed(cli.err[0]!), /^ERROR \[smard\.cli\] option '--timeout <ms>' argument '5\\u200b000' is invalid\. "5\\u200b000" contains an invisible or control character \(U\+200B\)\.$/);
+});

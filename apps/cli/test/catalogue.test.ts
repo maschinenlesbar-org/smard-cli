@@ -30,8 +30,24 @@ test("filtersByGroup returns the whole catalogue without a group, else one group
   assert.ok(price.every((f) => f.group === "price"));
 });
 
+test("filtersByGroup takes a group as a token: trimmed and NFC, case kept (D8)", () => {
+  assert.deepEqual(filtersByGroup(" price " as never), filtersByGroup("price"));
+});
+
+test("filtersByGroup refuses an invisible or control character, showing it escaped (D8, D10)", () => {
+  for (const [bad, shown] of [["pr\u200bice", "pr\\u200bice"], ["price\u00ad", "price\\u00ad"], ["\u202eprice", "\\u202eprice"]]) {
+    assert.throws(
+      () => filtersByGroup(bad as never),
+      (err: unknown) => err instanceof SmardValidationError && err.message.includes(shown!) && !err.message.includes(bad!),
+      shown,
+    );
+  }
+  assert.throws(() => filtersByGroup("" as never), { message: "Invalid group: Expected a non-empty value." });
+  assert.throws(() => filtersByGroup("\u200b" as never), { message: "Invalid group: Expected a non-empty value." });
+});
+
 test("filtersByGroup rejects an unknown group with SmardValidationError", () => {
-  for (const bad of ["Price", " price", "", "bogus", "constructor"]) {
+  for (const bad of ["Price", "bogus", "constructor"]) {
     assert.throws(
       () => filtersByGroup(bad as never),
       (err: unknown) =>
@@ -43,7 +59,7 @@ test("filtersByGroup rejects an unknown group with SmardValidationError", () => 
 });
 
 test("parity: filters --group gives the same result as filtersByGroup()", async () => {
-  for (const group of ["price", "forecast", "Price", " price", "", "bogus"]) {
+  for (const group of ["price", "forecast", "Price", " price", "", "bogus", "pr\u200bice"]) {
     const { cli, lib: l } = await parity(["--compact", "filters", "--group", group], () =>
       filtersByGroup(group as never),
     );

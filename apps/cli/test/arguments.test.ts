@@ -119,10 +119,10 @@ test("SmardClient rejects bad path arguments before any request", async () => {
     ["filter", () => c.series(NaN, "DE", "hour", 1)],
     ["filter", () => c.tableData(1.5, "DE", 1)],
     ["filter", () => c.timestamps("410/../../other", "DE", "hour")],
-    ["region", () => c.timestamps(410, " DE", "hour")],
+    ["region", () => c.timestamps(410, "D E", "hour")],
     ["region", () => c.timestamps(410, "..", "hour")],
     ["region", () => c.tableData(410, "XX", 1)],
-    ["resolution", () => c.latest(410, "DE", "hour ")],
+    ["resolution", () => c.latest(410, "DE", "Hour")],
     ["resolution", () => c.series(410, "DE", "hour/../../secret#", 1)],
     ["timestamp", () => c.series(410, "DE", "hour", 9007199254740993)],
     ["timestamp", () => c.series(410, "DE", "hour", 1e21)],
@@ -139,7 +139,8 @@ test("SmardClient rejects bad path arguments before any request", async () => {
       p = Promise.resolve();
     }
     assert.equal(sync, false, "must reject, not throw synchronously");
-    await assert.rejects(p, (e: unknown) => e instanceof SmardValidationError && e.message.startsWith(`Invalid ${name} "`));
+    // A blank or invisible value is named before the rule of its kind (`Invalid filter: …`, D8).
+    await assert.rejects(p, (e: unknown) => e instanceof SmardValidationError && (e.message.startsWith(`Invalid ${name} "`) || e.message.startsWith(`Invalid ${name}: `)));
   }
   assert.equal(mt.calls.length, 0);
 });
@@ -147,9 +148,9 @@ test("SmardClient rejects bad path arguments before any request", async () => {
 test("parity: bad chart arguments are rejected by the CLI and the library alike, with no request", async () => {
   const cases: [string[], (c: SmardClient) => Promise<unknown>][] = [
     [["timestamps", "-1", "DE", "hour"], (c) => c.timestamps(-1, "DE", "hour")],
-    [["timestamps", "410", " DE", "hour"], (c) => c.timestamps(410, " DE" as never, "hour")],
+    [["timestamps", "410", "D\u200bE", "hour"], (c) => c.timestamps(410, "D\u200bE" as never, "hour")],
     [["timestamps", "410", "de", "hour"], (c) => c.timestamps(410, "de" as never, "hour")],
-    [["latest", "410", "DE", "hour "], (c) => c.latest(410, "DE", "hour " as never)],
+    [["latest", "410", "DE", "hour\u00ad"], (c) => c.latest(410, "DE", "hour\u00ad" as never)],
     [["series", "410", "DE", "Hour", "1"], (c) => c.series(410, "DE", "Hour" as never, 1)],
     [["series", "410", "DE", "hour", "-5"], (c) => c.series(410, "DE", "hour", -5)],
     [["table", "410", "XX", "1"], (c) => c.tableData(410, "XX" as never, 1)],
@@ -168,6 +169,8 @@ test("parity: bad chart arguments are rejected by the CLI and the library alike,
 test("parity: valid chart arguments send the identical request", async () => {
   const cases: [string[], (c: SmardClient) => Promise<unknown>][] = [
     [["timestamps", "410", "DE", "hour"], (c) => c.timestamps(410, "DE", "hour")],
+    // A region or resolution is a token: sent trimmed and NFC (D8).
+    [["timestamps", "410", " DE ", "hour\n"], (c) => c.timestamps(410, " DE " as never, "hour\n" as never)],
     [["series", "0", "50Hertz", "year", "1700000000000"], (c) => c.series(0, "50Hertz", "year", 1700000000000)],
     [["latest", "4068", "DE-LU", "week"], (c) => c.latest(4068, "DE-LU", "week")],
     [["table", "122", "AT", "1577836800000"], (c) => c.tableData(122, "AT", 1577836800000)],
@@ -190,7 +193,7 @@ test("echoed values and server text are cut at 500 characters; null options mean
   });
   assert.equal(code, 1);
   assert.ok(cli.err.join("\n").length < 700, `${cli.err.join("\n").length} characters`);
-  assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.cli\] Invalid filter "9{500}…"\. Expected a non-negative integer\.$/);
+  assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.cli\] Invalid filter "9{500}"…\. Expected a non-negative integer\.$/);
   const detail = "boom ".repeat(10_000);
   const client = new SmardClient({ transport: makeMockTransport(() => jsonResponse({ detail }, 500)).transport, maxRetries: 0 });
   await assert.rejects(client.timestamps(410, "DE", "hour"), (e: unknown) => e instanceof Error && e.message.length < 700);
