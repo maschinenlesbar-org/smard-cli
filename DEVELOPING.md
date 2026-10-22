@@ -112,12 +112,15 @@ returning an empty list.
 > Before any shape check, `getJson` refuses a body with a number `JSON.parse` can't
 > carry exactly (`firstInexactNumber`): one out of a double's range (`1e400` would
 > become `Infinity`, printed as `null`), one past 2^53 that would print as another
-> number (`12345678901234567890`, in any written form), and a non-zero one too small
-> for a double (`1e-400` would become `0`). The message is `Unexpected response from
+> number (`12345678901234567890`, in any written form), a non-zero one too small
+> for a double (`1e-400` would become `0`), and a subnormal one (below
+> 2.2250738585072014e-308) that does not print as written (`3e-324` would become
+> `5e-324`). The message is `Unexpected response from
 > <path>: the number <N> cannot be represented exactly.` (`SmardParseError`, exit 1).
-> Past 2^53 the number as printed (`String(value)`) is compared with the number as
-> written, so `1E23` passes; below 2^53 a decimal fraction keeps a double's precision,
-> so SMARD's millisecond timestamps and decimal values pass unchanged.
+> Past 2^53 and below the normal range the number as printed (`String(value)`) is
+> compared with the number as written, so `1E23` and `5e-324` pass; in between a decimal
+> fraction keeps a double's precision, so SMARD's millisecond timestamps and decimal
+> values pass unchanged.
 
 ## Architecture
 
