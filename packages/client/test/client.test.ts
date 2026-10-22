@@ -66,7 +66,7 @@ test("a malformed index body is a SmardParseError, not an empty list", async () 
       (err: unknown) =>
         err instanceof SmardParseError &&
         err.message ===
-          'Unexpected response shape from /app/chart_data/410/DE/index_hour.json: expected a JSON object with a "timestamps" array.',
+          'GET https://www.smard.de/app/chart_data/410/DE/index_hour.json: unexpected response shape: expected a JSON object with a "timestamps" array.',
       JSON.stringify(body),
     );
     await assert.rejects(() => clientWith(mt).latest(410, "DE", "hour"), SmardParseError);

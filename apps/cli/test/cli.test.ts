@@ -227,7 +227,7 @@ test("a malformed index body exits 1 with a parse error, never [] or an invented
       const code = await run(["--compact", cmd, "9", "DE", "hour"], cli.deps);
       assert.equal(code, 1, `${cmd} ${JSON.stringify(body)}`);
       assert.deepEqual(cli.out, []);
-      assert.match(cli.err.join("\n"), /Unexpected response shape from .*index_hour\.json/);
+      assert.match(cli.err.join("\n"), /GET https:\/\/www\.smard\.de\/.*index_hour\.json: unexpected response shape: /);
     }
   }
 });
@@ -321,7 +321,7 @@ test("a malformed data file exits 1 with a parse error, never printed as a resul
       const code = await run(["--compact", ...argv], cli.deps);
       assert.equal(code, 1, `${argv[0]} ${JSON.stringify(body)}`);
       assert.deepEqual(cli.out, [], `${argv[0]} ${JSON.stringify(body)}`);
-      assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] (Unexpected response shape|Malformed data file) from \/app\/chart_data\//);
+      assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] GET https:\/\/www\.smard\.de\/app\/chart_data\/.*: (unexpected response shape|malformed data file): /);
     }
   }
 });
@@ -342,7 +342,7 @@ test("a malformed table_data file exits 1 with a parse error", async () => {
     const code = await run(["--compact", "table", "835", "DE", "1000"], cli.deps);
     assert.equal(code, 1, JSON.stringify(body));
     assert.deepEqual(cli.out, []);
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] (Unexpected response shape|Malformed table_data file) from \/app\/table_data\//);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] GET https:\/\/www\.smard\.de\/app\/table_data\/.*: (unexpected response shape|malformed table_data file): /);
   }
   // The live shape, extra keys included, passes unchanged.
   const live = {
@@ -363,7 +363,7 @@ test("a negative timestamp in the index is the server's malformed index, never t
     const code = await run(argv, cli.deps);
     assert.equal(code, 1, argv[0]);
     assert.deepEqual(cli.out, []);
-    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] Malformed index from \/app\/chart_data\/817\/DE\/index_hour\.json: "timestamps" contains an element that is not a non-negative integer\.$/);
+    assert.match(untimed(cli.err.join("\n")), /^ERROR \[smard\.api\] GET https:\/\/www\.smard\.de\/app\/chart_data\/817\/DE\/index_hour\.json: malformed index: "timestamps" contains an element that is not a non-negative integer\.$/);
     assert.doesNotMatch(cli.err.join("\n"), /Invalid timestamp/);
     assert.equal(cli.mt.calls.length, 1, "no data file is requested");
   }

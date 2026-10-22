@@ -19,6 +19,7 @@ import {
   toWellFormed,
 } from "../src/errors.js";
 import { makeMockTransport, jsonResponse, rawResponse } from "./helpers.js";
+import type { HttpResponse } from "../src/http.js";
 
 // Control characters built via char codes so no raw control bytes ever appear in
 // this source file.
@@ -106,7 +107,7 @@ test("a number the JSON cannot carry exactly is a parse error, never a changed v
     const e = new RequestEngine({ transport: makeMockTransport(() => rawResponse(body(n), "application/json")).transport });
     await assert.rejects(e.getJson("/app/chart_data/410/DE/index_hour.json"), (err: unknown) => {
       assert.ok(err instanceof SmardParseError, n);
-      assert.equal(err.message, `Unexpected response from /app/chart_data/410/DE/index_hour.json: the number ${n} cannot be represented exactly.`);
+      assert.equal(err.message, `GET https://www.smard.de/app/chart_data/410/DE/index_hour.json: the number ${n} cannot be represented exactly.`);
       return true;
     });
   }
@@ -152,7 +153,7 @@ test("getJson decodes a body by its declared charset, drops a BOM, rejects an un
   const unknown = makeMockTransport(() => rawResponse('{"a":1}', "application/json; charset=x-nonsense"));
   await assert.rejects(
     () => new RequestEngine({ transport: unknown.transport }).getJson("/x"),
-    (e: unknown) => e instanceof SmardParseError && /Unsupported response charset "x-nonsense"/.test(e.message),
+    (e: unknown) => e instanceof SmardParseError && e.message === 'GET https://www.smard.de/x: unsupported response charset "x-nonsense".',
   );
 });
 
@@ -391,7 +392,7 @@ test("bigIntegerKeys: a declared member's number is its exact literal as a strin
   await assert.rejects(other.getJson("/x"), /the number 12345678901234567890 cannot be represented exactly/);
   // Malformed stays malformed: a declared member with a leading zero still fails JSON.parse.
   const malformed = new RequestEngine({ bigIntegerKeys: new Set(["_version_"]), transport: makeMockTransport(() => rawResponse('{"_version_":01}', "application/json")).transport });
-  await assert.rejects(malformed.getJson("/x"), /Failed to parse JSON/);
+  await assert.rejects(malformed.getJson("/x"), /: the answer is not valid JSON\./);
   for (const bad of [new Set([""]), new Set([1]), "x", 5, null]) {
     assert.throws(() => new RequestEngine({ bigIntegerKeys: bad as unknown as ReadonlySet<string> }),
       (err: unknown) => err instanceof SmardValidationError && err.message === "Invalid option bigIntegerKeys: expected a set of non-empty member names.");
@@ -406,4 +407,52 @@ test("bigIntegerKeys: a declared member's number is its exact literal as a strin
   // Without declarations the scan is the plain number check.
   assert.equal(firstInexactNumber('{"a":"1e400","b":3e-324}'), "3e-324");
   assert.deepEqual(scanNumbers('{"a":1}'), { json: '{"a":1}', inexact: undefined });
+});
+
+test("a malformed response from a custom transport is a SmardNetworkError naming the request, not a TypeError", async () => {
+  for (const [response, problem] of [
+    [{}, "status is not an HTTP status code"],
+    [null, "not an object"],
+    [42, "not an object"],
+    [{ status: 200 }, "headers is not an object"],
+    [{ status: "200", headers: {}, body: Buffer.alloc(0) }, "status is not an HTTP status code"],
+    [{ status: 200, headers: {}, body: '{"timestamps":[]}' }, "body is not a Buffer, Uint8Array, other ArrayBuffer view or ArrayBuffer"],
+  ] as const) {
+    const e = new RequestEngine({
+      baseUrl: "https://alice:s3cret@mirror.test",
+      transport: async () => response as unknown as HttpResponse,
+    });
+    await assert.rejects(
+      () => e.getJson("/app/chart_data/410/DE/index_hour.json"),
+      (err: unknown) =>
+        err instanceof SmardNetworkError &&
+        err.message ===
+          `GET https://***@mirror.test/app/chart_data/410/DE/index_hour.json failed: the transport returned an invalid response (${problem}).`,
+      problem,
+    );
+  }
+});
+
+test("an answer error names the request: method and URL, userinfo redacted (D9)", async () => {
+  const answers: Array<[string, () => HttpResponse]> = [
+    ["not valid JSON", () => rawResponse("<html>", "text/html")],
+    ["empty response body", () => rawResponse(" ", "application/json")],
+    ["cannot be represented exactly", () => rawResponse('{"n":1e400}', "application/json")],
+    ["unsupported response charset", () => rawResponse("{}", "application/json; charset=x-bogus")],
+  ];
+  for (const [what, respond] of answers) {
+    const e = new RequestEngine({ baseUrl: "https://alice:s3cret@mirror.test/smard", transport: makeMockTransport(respond).transport });
+    await assert.rejects(e.getJson("/app/x.json", { q: "x" }), (err: unknown) => {
+      assert.ok(err instanceof SmardParseError, what);
+      assert.ok(err.message.startsWith("GET https://***@mirror.test/smard/app/x.json?q=x: "), err.message);
+      assert.ok(err.message.includes(what), err.message);
+      assert.ok(!err.message.includes("s3cret"), err.message);
+      return true;
+    });
+  }
+  // A proxy's HTML page says what it was.
+  const html = new RequestEngine({ transport: makeMockTransport(() => rawResponse("<html>", "text/html; charset=utf-8")).transport });
+  await assert.rejects(html.getJson("/x"), {
+    message: 'GET https://www.smard.de/x: the answer is not valid JSON (expected JSON, got Content-Type "text/html").',
+  });
 });

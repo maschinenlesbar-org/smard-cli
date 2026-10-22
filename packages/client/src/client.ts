@@ -54,12 +54,14 @@ function isValue(value: unknown): value is number | null {
  * it has no file for with a 404, so anything else — `null`, `{}`, an array, an error
  * object such as `{"error": "maintenance", "series": null}`, string values (`"80"`, which
  * jq sorts above every number), a short or long tuple — is an error page or a changed
- * format, and is a SmardParseError rather than data a caller computes on.
+ * format, and is a SmardParseError rather than data a caller computes on. `request` is what the
+ * message names, `GET <url>` (as `RequestEngine.describeUrl` gives the URL), like every error
+ * about an answer.
  */
-export function checkSeriesResult(body: unknown, path: string): SeriesResult {
+export function checkSeriesResult(body: unknown, request: string): SeriesResult {
   if (!isObject(body) || !isObject(body.meta_data) || !Array.isArray(body.series)) {
     throw new SmardParseError(
-      `Unexpected response shape from ${path}: expected a JSON object with "meta_data" and a "series" array.`,
+      `${request}: unexpected response shape: expected a JSON object with "meta_data" and a "series" array.`,
     );
   }
   const bad = body.series.findIndex(
@@ -67,7 +69,7 @@ export function checkSeriesResult(body: unknown, path: string): SeriesResult {
   );
   if (bad >= 0) {
     throw new SmardParseError(
-      `Malformed data file from ${path}: "series" point ${bad} is not [epoch-ms timestamp, number or null].`,
+      `${request}: malformed data file: "series" point ${bad} is not [epoch-ms timestamp, number or null].`,
     );
   }
   return body as unknown as SeriesResult;
@@ -77,12 +79,12 @@ export function checkSeriesResult(body: unknown, path: string): SeriesResult {
  * Check a `table_data` file against the documented shape and return it:
  * `{"meta_data": {…}, "series": [{"values": [{"timestamp": epochMs, "versions":
  * [{"value": number|null, "name": …}, …]}, …]}, …]}`. Anything else is a SmardParseError,
- * as for {@link checkSeriesResult}. Extra keys (a version's `info`) are kept.
+ * as for {@link checkSeriesResult}, naming `request`. Extra keys (a version's `info`) are kept.
  */
-export function checkTableResult(body: unknown, path: string): TableResult {
+export function checkTableResult(body: unknown, request: string): TableResult {
   if (!isObject(body) || !isObject(body.meta_data) || !Array.isArray(body.series)) {
     throw new SmardParseError(
-      `Unexpected response shape from ${path}: expected a JSON object with "meta_data" and a "series" array.`,
+      `${request}: unexpected response shape: expected a JSON object with "meta_data" and a "series" array.`,
     );
   }
   const goodPoint = (p: unknown): boolean =>
@@ -93,7 +95,7 @@ export function checkTableResult(body: unknown, path: string): TableResult {
   const bad = body.series.findIndex((e) => !isObject(e) || !Array.isArray(e.values) || !e.values.every(goodPoint));
   if (bad >= 0) {
     throw new SmardParseError(
-      `Malformed table_data file from ${path}: "series" entry ${bad} is not {"values": [{"timestamp": epoch-ms, "versions": [{"value": number or null}]}]}.`,
+      `${request}: malformed table_data file: "series" entry ${bad} is not {"values": [{"timestamp": epoch-ms, "versions": [{"value": number or null}]}]}.`,
     );
   }
   return body as unknown as TableResult;
@@ -113,6 +115,7 @@ export class SmardClient {
     assertResolution(resolution);
     const path = `/app/chart_data/${enc(filter)}/${enc(region)}/index_${enc(resolution)}.json`;
     const res = await this.engine.getJson<unknown>(path);
+    const request = `GET ${this.engine.describeUrl(path)}`;
     // SMARD answers a (filter, region, resolution) without data with a 404, never
     // with an empty or absent index, so anything but `{"timestamps": [...]}` (null,
     // an array, `{}`, `timestamps: null`) is an error page or a changed format —
@@ -120,7 +123,7 @@ export class SmardClient {
     const ts = isObject(res) ? res.timestamps : undefined;
     if (!Array.isArray(ts)) {
       throw new SmardParseError(
-        `Unexpected response shape from ${path}: expected a JSON object with a "timestamps" array.`,
+        `${request}: unexpected response shape: expected a JSON object with a "timestamps" array.`,
       );
     }
     // Validate the *element* type, not just that `timestamps` is an array. A
@@ -133,7 +136,7 @@ export class SmardClient {
     // blamed the user ("Invalid timestamp "-5"") for a value the server sent.
     if (!ts.every(isEpochMs)) {
       throw new SmardParseError(
-        `Malformed index from ${path}: "timestamps" contains an element that is not a non-negative integer.`,
+        `${request}: malformed index: "timestamps" contains an element that is not a non-negative integer.`,
       );
     }
     return ts;
@@ -151,7 +154,7 @@ export class SmardClient {
     assertResolution(resolution);
     assertId("timestamp", timestamp);
     const path = `/app/chart_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_${enc(resolution)}_${enc(timestamp)}.json`;
-    return checkSeriesResult(await this.engine.getJson<unknown>(path), path);
+    return checkSeriesResult(await this.engine.getJson<unknown>(path), `GET ${this.engine.describeUrl(path)}`);
   }
 
   /** Convenience: fetch the newest available window's data in one call. */
@@ -176,6 +179,6 @@ export class SmardClient {
     assertRegion(region);
     assertId("timestamp", timestamp);
     const path = `/app/table_data/${enc(filter)}/${enc(region)}/${enc(filter)}_${enc(region)}_quarterhour_${enc(timestamp)}.json`;
-    return checkTableResult(await this.engine.getJson<unknown>(path), path);
+    return checkTableResult(await this.engine.getJson<unknown>(path), `GET ${this.engine.describeUrl(path)}`);
   }
 }

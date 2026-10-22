@@ -124,8 +124,18 @@ returning an empty list.
 > number (`12345678901234567890`, in any written form), a non-zero one too small
 > for a double (`1e-400` would become `0`), and a subnormal one (below
 > 2.2250738585072014e-308) that does not print as written (`3e-324` would become
-> `5e-324`). The message is `Unexpected response from
-> <path>: the number <N> cannot be represented exactly.` (`SmardParseError`, exit 1).
+> `5e-324`). The message is `GET <url>: the number <N> cannot be represented
+> exactly.` (`SmardParseError`, exit 1).
+>
+> Every error about an answer names the request like a network error does: `GET <url>: …`,
+> the full request URL with userinfo redacted and cut at 500 characters — `GET <url>: the
+> answer is not valid JSON (expected JSON, got Content-Type "text/html").`, `GET <url>:
+> empty response body.`, `GET <url>: unsupported response charset "…".`, `GET <url>:
+> unexpected response shape: expected …`, `GET <url>: malformed data file: …` (or
+> `malformed index`, `malformed table_data file`). `checkSeriesResult(body, request)` and
+> `checkTableResult(body, request)` take that `GET <url>` as their second argument. A custom
+> transport that resolves with something that is no `HttpResponse` is a `SmardNetworkError`
+> of the same form: `GET <url> failed: the transport returned an invalid response (…)`.
 > Past 2^53 and below the normal range the number as printed (`String(value)`) is
 > compared with the number as written, so `1E23` and `5e-324` pass; in between a decimal
 > fraction keeps a double's precision, so SMARD's millisecond timestamps and decimal
