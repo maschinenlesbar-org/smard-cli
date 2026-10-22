@@ -223,6 +223,10 @@ shape, an unknown charset, a number JSON can't carry exactly), `http` (the conne
 record names the cause and suggests `--compact` only where that prints the answer). A record is always one line; control characters in it are
 escaped.
 
+**Replaced text.** Bytes of an answer that are not valid in its charset, and half characters
+(lone surrogates), are replaced with U+FFFD and reported in one `WARN` record of
+`smard.api` with the count and the request; the run still succeeds.
+
 ---
 
 > **Library & internals.** Terms for the TypeScript client and its internals —

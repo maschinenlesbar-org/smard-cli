@@ -192,6 +192,8 @@ export function action<A = string[]>(
     if (cleartext !== undefined) logOf(deps).warn("http", cleartext);
     const engineOptions = toEngineOptions(global);
     engineOptions.onRetry = (event) => logOf(deps).warn("http", retryMessage(event));
+    // An answer delivered changed (invalid text replaced with U+FFFD) is never silent.
+    engineOptions.onWarning = (message) => logOf(deps).warn("api", message);
     const client = deps.createClient(engineOptions);
     await fn({ client, global, opts: command.opts() }, parsed);
   };

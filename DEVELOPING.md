@@ -62,6 +62,7 @@ new SmardClient({
   maxResponseBytes: 50 << 20, // abort responses larger than 50 MiB (0 = unlimited)
   userAgent: "my-app/1.0",    // a header value: no control characters, nothing above U+00FF
   transport: customTransport, // inject your own HTTP transport
+  onWarning: (message) => console.warn(message), // an answer delivered changed (U+FFFD), see below
   bigIntegerKeys: new Set(["_version_"]), // members whose numbers may pass 2^53: delivered as strings
 });
 ```
@@ -73,6 +74,10 @@ its timestamps epoch milliseconds) is the one exception: its number value is del
 exact literal, as written, as a JSON string (`"1858054135406919680"`, `"5"`), whatever its size,
 so its type is stable. The engine does both in one linear scan of the text before `JSON.parse`
 (`scanNumbers`, which quotes the declared values in place; no reviver).
+Text is never changed silently either: bytes that aren't valid in the answer's charset and lone
+surrogates written as JSON escapes (`\ud800`) become U+FFFD (the result is well-formed, so `jq`
+reads the CLI's output), and `onWarning` gets one message naming the count and the request; the
+CLI logs it as a `WARN` record of `smard.api`. One bad character never sinks a whole answer.
 
 Every option is declared `?: T | undefined`, and `undefined` means the default, as an
 omitted option does: a consumer compiled with `exactOptionalPropertyTypes` can write
@@ -283,7 +288,8 @@ errors. Sits between the client and the transport.
 — raw bytes, never lossily decoded. `getJson` decodes them by the charset the
 `Content-Type` names (UTF-8 when it names none; SMARD sends none) with
 `TextDecoder`, which drops a leading byte order mark; an unknown charset label is a
-`SmardParseError`.
+`SmardParseError`. Bytes not valid in the charset become U+FFFD, reported through
+`onWarning` (see "Exact answers").
 
 **Closed pipes.** The bin shim installs `handleOutputErrors()` (`io.ts`) before
 `run()`: an EPIPE on stdout (`| head`) exits 0 quietly, an EPIPE on stderr is
@@ -525,7 +531,10 @@ everything that drives the CLI is in `apps/cli/test/`.
   input corpus (no text filter, so `textInputs` is empty; the filter, region, resolution and
   timestamp path segments are refused alike by the CLI and the library), P25 the response
   corpus (a data file's value: a number JSON can't carry exactly or an empty answer is an
-  error, exit 1). P26 (`-o` integrity) is not here: smard writes no files.
+  error, exit 1; a subnormal that prints changed too; the error names the request), P27 big
+  and odd answers (a large flat answer and one of DEL characters print within a small heap,
+  or are "too large" past V8's longest string; a lone surrogate or invalid bytes become U+FFFD
+  with a `WARN` record of `smard.api`). P26 (`-o` integrity) is not here: smard writes no files.
 
 ## Continuous integration
 

@@ -134,7 +134,10 @@ errors, `smard.api` for the API's answers, a malformed answer included, `smard.h
 for the connection,
 `smard.output` for a failed write to stdout, or an answer too deeply nested or too large
 to print, which names the cause and suggests `--compact` only where `--compact` prints
-that answer). By default
+that answer). An error about an answer names the request (`GET <url>: the answer is not
+valid JSON`). Text in an answer is never changed silently: bytes that are not valid in its
+charset and half characters (lone surrogates) are replaced with U+FFFD, so the output stays
+readable for `jq`, and a `WARN` record of `smard.api` says how many. By default
 it is written log4j style; `--log-format jsonl` writes one JSON object per line instead.
 A record is always one line: a line break, a control character or a bidi control in a
 message (a server's text, a value you typed) is written as an escape (`\n`, `\u001b`,

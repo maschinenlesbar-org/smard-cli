@@ -224,6 +224,10 @@ Schreiben auf stdout oder eine zu tief verschachtelte oder zu große Antwort; de
 die Ursache und schlägt `--compact` nur vor, wo das die Antwort ausgibt). Ein Eintrag ist immer eine Zeile; Steuerzeichen darin werden
 maskiert.
 
+**Ersetzter Text.** Bytes einer Antwort, die in ihrem Zeichensatz ungültig sind, und halbe
+Zeichen (einzelne Surrogate) werden durch U+FFFD ersetzt und in einem `WARN`-Eintrag von
+`smard.api` mit Anzahl und Anfrage gemeldet; der Lauf gelingt trotzdem.
+
 ---
 
 > **Bibliothek & Interna.** Begriffe zum TypeScript-Client und seinen Interna –
