@@ -406,7 +406,15 @@ details, transport error text and the `cause` chain
 (`apps/cli/test/conformance-p2-library-redaction.test.ts`) — and with it the forms a server
 echoes it back in (`echoedCredentialForms`, exported): the `Authorization: Basic` value,
 the decoded `user:password`, and the password alone from 4 characters on
-(`redactSecrets`, exported). The CLI replaces the Basic value and the pair on stdout and
+(`redactSecrets`, exported), each also percent-encoded as in a URL. The userinfo is taken as
+typed and as WHATWG sends it in the request URL. An error's `detail` is decoded text and is
+scrubbed again after `JSON.parse`, before it is cleaned and cut: a JSON escape (`\"`, `\u00e4`,
+PHP's `\/`) hid the echo from the scrub of the body as sent, and the cleaning would have turned a
+password's TAB or control character into a form no exact string matches. `SmardApiError.body`
+stays the body as sent, scrubbed, unless it is JSON with an escape whose decoded text still holds
+an echoed form: then it is that JSON written again (`JSON.stringify`, other escapes, no
+insignificant whitespace) with the forms replaced by `***`, and `""` for one nested too deeply to
+write again (`scrubBody`). The CLI replaces the Basic value and the pair on stdout and
 stderr, the bare password on stderr only (on stdout a short password may well occur in
 the data).
 

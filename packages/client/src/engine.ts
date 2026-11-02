@@ -187,6 +187,18 @@ export function isBidiControl(code: number): boolean {
 }
 
 /**
+ * `form` and its spelling in a URL (`encodeURIComponent`): a server that puts a credential into
+ * a URL percent-encodes it. A form that has no such spelling (a lone surrogate) is kept as it is.
+ */
+function urlSpellings(form: string): string[] {
+  try {
+    return [form, encodeURIComponent(form)];
+  } catch {
+    return [form];
+  }
+}
+
+/**
  * Strip control characters (all C0/C1 controls, plus DEL) out of a string that
  * originates in an attacker-controlled response body — the API error `detail`.
  * `JSON.parse` decodes an escaped ESC (a "backslash-u-001b" JSON sequence) in an
@@ -410,8 +422,8 @@ export class RequestEngine {
   readonly #credentials: string[];
   /**
    * The forms a server echoes that userinfo back in (the Basic value, the decoded
-   * `user:password`, the password alone), longest first, so a password never leaves half
-   * of the `user:password` around it.
+   * `user:password`, the password alone; `echoedCredentialForms`), each also percent-encoded
+   * as in a URL, longest first, so a password never leaves half of the `user:password` around it.
    */
   readonly #echoed: string[];
   private readonly transport: Transport;
@@ -435,16 +447,18 @@ export class RequestEngine {
     this.#baseUrl = options.baseUrl === undefined
       ? DEFAULT_BASE_URL
       : validateBaseUrl(options.baseUrl);
-    this.#credentials = credentialsIn(this.#baseUrl).flatMap((raw) => {
+    // The userinfo as typed and as WHATWG sends it (it percent-encodes some of its characters,
+    // and a server echoes the request URL in that spelling).
+    const userinfos = [...new Set([...credentialsIn(this.#baseUrl), ...credentialsIn(new URL(this.#baseUrl).href)])];
+    this.#credentials = userinfos.flatMap((raw) => {
       try {
         return [raw, decodeURIComponent(raw)];
       } catch {
         return [raw];
       }
     });
-    this.#echoed = credentialsIn(this.#baseUrl)
-      .flatMap(echoedCredentialForms)
-      .sort((a, b) => b.length - a.length);
+    // Longest first, so a password never leaves half of the user:password around it.
+    this.#echoed = [...new Set(userinfos.flatMap(echoedCredentialForms).flatMap(urlSpellings))].sort((a, b) => b.length - a.length);
     this.transport = functionOption("transport", options.transport, nodeHttpTransport);
     // Only `undefined` selects the default User-Agent (some endpoints serve an HTML
     // challenge page, not JSON, without one). Any value passed must be a valid,
@@ -510,6 +524,32 @@ export class RequestEngine {
    */
   private scrub(text: string): string {
     return this.#credentials.length === 0 ? text : redactSecrets(redactCredentials(text, this.#credentials), this.#echoed);
+  }
+
+  /**
+   * An error body, already scrubbed as sent, as `SmardApiError.body` keeps it: when it is
+   * JSON with an escape in it, checked decoded too. An escape (`\"`, `\u00e4`, `\/`) hides an
+   * echoed credential from the scrub of the text as sent, while a caller who parses the body sees
+   * it. Such a body is kept as the decoded JSON written again (`JSON.stringify`, one spelling per
+   * character) with the credential scrubbed in that spelling. A body that doesn't parse is text
+   * nobody decodes, and stays as sent; one too deeply nested to write again is left out.
+   */
+  private scrubBody(scrubbed: string): string {
+    if (this.#echoed.length === 0 || !scrubbed.includes("\\")) return scrubbed;
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(scrubbed);
+    } catch {
+      return scrubbed;
+    }
+    let rewritten: string;
+    try {
+      rewritten = JSON.stringify(decoded);
+    } catch {
+      return "";
+    }
+    const spelled = this.#echoed.map((form) => JSON.stringify(form).slice(1, -1));
+    return spelled.some((form) => rewritten.includes(form)) ? redactSecrets(rewritten, spelled) : scrubbed;
   }
 
   /**
@@ -779,12 +819,14 @@ export class RequestEngine {
     // message that run.ts prints raw.
     // It is cut at MAX_MESSAGE_VALUE_LENGTH: a 200 kB detail must not flood a CI log
     // (`body` keeps the full text).
-    if (detail !== undefined) detail = cutForMessage(sanitizeServerText(detail).replace(/\s+/g, " ").trim());
+    // It is decoded text: scrubbed again first (a JSON escape hid the credential from the scrub
+    // of the body as sent), before the cleaning changes a password's controls or spaces.
+    if (detail !== undefined) detail = cutForMessage(sanitizeServerText(this.scrub(detail)).replace(/\s+/g, " ").trim());
     return new SmardApiError({
       status,
       url,
       method,
-      body: text,
+      body: this.scrubBody(text),
       detail,
       retries: retry.retries,
       ...(retry.retryAfterMs === undefined ? {} : { retryAfterMs: retry.retryAfterMs, maxRetryAfterMs: MAX_RETRY_AFTER_MS }),

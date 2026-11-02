@@ -584,3 +584,14 @@ test("the CLI's userinfo redaction of stdout is linear in the answer (security a
   assert.ok(cli.out.join("\n").includes(value));
   assert.ok(ms < 1500, `${Math.round(ms)} ms`);
 });
+
+test("a password with a TAB or a control character echoed in an error never reaches stderr (security audit 2026-10-27, D)", async () => {
+  for (const pw of ["dummy\tpass-1234", "dummy\u0001pass-1234"]) {
+    const cli = makeCli(() => jsonResponse({ detail: `wrong password ${pw}` }, 401));
+    const code = await run(["--base-url", `https://js:${encodeURIComponent(pw)}@mirror.example`, "--max-retries", "0", "timestamps", "410", "DE", "hour"], cli.deps);
+    assert.equal(code, 1);
+    const err = cli.err.join("\n");
+    assert.match(err, /ERROR \[smard\.api\] .*wrong password \*\*\*/, err);
+    assert.doesNotMatch(err, /dummy|pass-1234/, err);
+  }
+});

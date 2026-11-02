@@ -269,7 +269,10 @@ export class SmardError extends Error {
 
 /**
  * The API responded with a non-2xx status code. `detail` holds a human-readable
- * message extracted from the response body when one is present.
+ * message extracted from the response body when one is present. `body` is the body as sent
+ * with the base URL's credentials scrubbed; when it is JSON whose escapes hid an echoed
+ * credential from that scrub, it is the decoded JSON written again (`JSON.stringify`) with the
+ * credential replaced by `***` (`""` if too deeply nested to write again).
  */
 export class SmardApiError extends SmardError {
   readonly status: number;
