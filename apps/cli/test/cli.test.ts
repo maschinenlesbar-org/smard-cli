@@ -585,6 +585,18 @@ test("the CLI's userinfo redaction of stdout is linear in the answer (security a
   assert.ok(ms < 1500, `${Math.round(ms)} ms`);
 });
 
+test("the CLI's userinfo redaction of stdout hides the userinfo of a URL glued onto the one before it (security audit 2026-10-27, B2)", async () => {
+  // The linear pass read the first URL's authority up to the second `://` and searched on after
+  // it, so the second URL's userinfo reached stdout; the scheme regex it replaced redacted both.
+  const value = "https://host://u:p1@h and https://u:p2@x://v:q3@w";
+  const cli = makeCli(() => jsonResponse({ meta_data: { version: 1, created: 2, note: value }, series: [[1700000000000, 1]] }));
+  const code = await run(["--base-url", "https://alice:s3cret-Pw@mirror.example", "--compact", "series", "410", "DE", "hour", "1700000000000"], cli.deps);
+  assert.equal(code, 0, cli.err.join("\n"));
+  const out = cli.out.join("\n");
+  assert.ok(out.includes("https://host://***@h and https://***@x://***@w"), out);
+  for (const secret of ["u:p1", "u:p2", "v:q3"]) assert.ok(!out.includes(secret), out);
+});
+
 test("a password with a TAB or a control character echoed in an error never reaches stderr (security audit 2026-10-27, D)", async () => {
   for (const pw of ["dummy\tpass-1234", "dummy\u0001pass-1234"]) {
     const cli = makeCli(() => jsonResponse({ detail: `wrong password ${pw}` }, 401));
