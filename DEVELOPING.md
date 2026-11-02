@@ -269,7 +269,10 @@ apps/cli/src/cli/
   counts (a bare `a:b@c` is a region, a User-Agent or a search text as often as a
   credential), except as the `--base-url` value, where a `user:password@host` typed
   without its scheme is still a credential; and every line printed on stdout or stderr has those strings replaced by `***`
-  (`redactCredentials`), with a pattern-based backstop. A pattern alone can't
+  (`redactCredentials`), with a pattern-based backstop (`redactUrlUserinfo`, in the client's
+  `errors.ts`: one linear pass, each `://` found with `indexOf` and its scheme by walking back;
+  the scheme regex it replaced was tried at every word start and was quadratic on a run such as
+  `a.a.a.…` in an answer, which held the CLI for seconds past `--timeout`). A pattern alone can't
   delimit a password that holds a space, quote, `#`, `?` or `/`; the exact strings
   can. The log replaces them in each record's *message* (`redactionFor`), before the
   record is cut and escaped, and writes the record to the raw stderr: the frame (time,

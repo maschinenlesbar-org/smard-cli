@@ -571,3 +571,16 @@ test("the URL search of the redaction is linear: a long argument, with or withou
     assert.ok(took < 1000, `${big.length} characters took ${Math.round(took)} ms`);
   }
 });
+
+test("the CLI's userinfo redaction of stdout is linear in the answer (security audit 2026-10-27, B)", async () => {
+  // With a URL with userinfo in argv, every stdout text is redacted. 200 000 characters of
+  // `a.a.…` took tens of seconds with the scheme regex; the linear pass takes milliseconds.
+  const value = "a.".repeat(100_000);
+  const cli = makeCli(() => jsonResponse({ meta_data: { version: 1, created: 2, note: value }, series: [[1700000000000, 1]] }));
+  const start = performance.now();
+  const code = await run(["--base-url", "https://alice:s3cret-Pw@mirror.example", "--compact", "series", "410", "DE", "hour", "1700000000000"], cli.deps);
+  const ms = performance.now() - start;
+  assert.equal(code, 0, cli.err.join("\n"));
+  assert.ok(cli.out.join("\n").includes(value));
+  assert.ok(ms < 1500, `${Math.round(ms)} ms`);
+});
