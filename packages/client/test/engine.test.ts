@@ -517,3 +517,31 @@ test("an answer longer than V8's longest string is a SmardParseError naming the 
   const failing = new RequestEngine({ maxResponseBytes: 0, transport: makeMockTransport(() => rawResponse(huge, "text/plain", 500)).transport });
   await assert.rejects(failing.getJson("/x"), (err: unknown) => err instanceof SmardApiError && err.status === 500 && err.body === "");
 });
+
+// ---- security audit 2026-10-27 ----
+
+/** The wall time of `run`, in milliseconds. */
+async function elapsedMs(run: () => unknown): Promise<number> {
+  const start = performance.now();
+  await run();
+  return performance.now() - start;
+}
+
+test("a number with a long run of zeros is refused in linear time (class A)", async () => {
+  // 1.<100 000 zeros>1e300 and 1.<…>1e-400 took about 15 s with the trailing-zero regex `/0+$/`,
+  // after the answer had arrived, so --timeout did not bound it.
+  for (const literal of [`1.${"0".repeat(100_000)}1e300`, `1.${"0".repeat(100_000)}1e-400`]) {
+    const engine = new RequestEngine({ transport: async () => rawResponse(`{"meta_data":{"v":${literal}},"series":[]}`, "application/json") });
+    let err: unknown;
+    const ms = await elapsedMs(async () => (err = await engine.getJson("/x").catch((caught: unknown) => caught)));
+    assert.ok(ms < 1000, `${Math.round(ms)} ms`);
+    assert.ok(err instanceof SmardParseError && /cannot be represented exactly/.test(err.message), String(err));
+    assert.ok(err.message.length < 1000, "the message quotes the literal cut");
+  }
+  // The same digits and exponent as before: trailing zeros count into the exponent.
+  assert.equal(scanNumbers("[1.2300e2, 0.000, 12300]").inexact, undefined);
+  assert.equal(scanNumbers("[1.000e-400]").inexact, "1.000e-400");
+  assert.equal(scanNumbers("[0.0e-400]").inexact, undefined);
+  assert.equal(scanNumbers("[1.2300e30, 1000000000000000000000000]").inexact, undefined);
+  assert.equal(scanNumbers("[90071992547409930]").inexact, "90071992547409930");
+});
