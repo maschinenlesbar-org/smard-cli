@@ -8,7 +8,7 @@
 
 import http from "node:http";
 import https from "node:https";
-import { credentialsIn, cutForMessage, redactCredentials, redactUrl, SmardNetworkError, SmardResponseTooLargeError } from "./errors.js";
+import { credentialsIn, cutForMessage, redactCredentials, redactUrl, SmardNetworkError, SmardResponseTooLargeError, typedUrlCredentials } from "./errors.js";
 
 export interface HttpRequest {
   method: string;
@@ -55,11 +55,12 @@ export const MAX_TIMEOUT_MS = 2_147_483_647;
 
 /**
  * `url` for a message, its userinfo redacted; one typed without its scheme (`user:pw@host`,
- * `TOKEN:@host`) is read as if it had one, since `redactUrl` finds a userinfo only after a scheme.
+ * `TOKEN:@host`) or with a mistyped one (`http//user:pw@host`) is read as a URL all the same
+ * (`typedUrlCredentials`), since `redactUrl` finds a userinfo only after a scheme.
  * Cut at MAX_MESSAGE_VALUE_LENGTH.
  */
 function shownUrl(url: string): string {
-  return cutForMessage(credentialsIn(url).length > 0 ? redactUrl(url) : redactCredentials(url, credentialsIn(`http://${url}`)));
+  return cutForMessage(credentialsIn(url).length > 0 ? redactUrl(url) : redactCredentials(url, typedUrlCredentials(url)));
 }
 
 /**

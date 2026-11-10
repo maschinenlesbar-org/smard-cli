@@ -307,6 +307,11 @@ apps/cli/src/cli/
   apps/cli/package.json); any other document is linked by its absolute GitHub URL.
   `apps/cli/test/conformance-p21-readme-links.test.ts` checks every relative link.
 
+  A base URL (`--base-url`, and the environment variable where the CLI reads one) is read as
+  a URL however its scheme is typed (`typedUrlCredentials`): missing (`alice:pw@host`) or
+  mistyped (`http//alice:pw@host`, the colon left out, whose userinfo is everything between the
+  first slashes and the last `@`), so commander's echo of a refused one shows no password.
+
 ### Library / technical terms
 
 **API client.** [`SmardClient`](packages/client/src/client.ts) — the typed wrapper over
