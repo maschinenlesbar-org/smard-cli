@@ -264,7 +264,9 @@ apps/cli/src/cli/
   time. The default transport (`http.ts`) still checks the scheme of every request
   URL (`SmardNetworkError`). Userinfo (`https://user:pw@mirror`) is kept and sent
   as Basic auth, but `redactUrl` shows it as `***` in every error message and in
-  `SmardApiError.url`, and no base-URL rejection echoes the value.
+  `SmardApiError.url`, and no base-URL rejection echoes the value or a part of it (a scheme is
+  named only when the value spells `<scheme>://`: a scheme-less `TOKEN:@host` parses with the
+  token as its scheme, and is refused as `Expected an absolute http(s) URL.`).
 - **Output redaction (CLI).** Commander repeats a rejected option value in its usage
   error (`option '--base-url <url>' argument '…' is invalid`), and the CLI's own
   messages echo rejected arguments. `run()` therefore starts with

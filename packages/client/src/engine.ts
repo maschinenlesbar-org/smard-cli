@@ -286,7 +286,9 @@ export function sanitizeServerText(text: string): string {
  *   repairs the URL silently, so the host requested would not be the one typed either.
  *
  * Userinfo (`https://user:pw@mirror`) is allowed and sent as Basic auth. No reason
- * echoes the value, so a credential in it never reaches an error message.
+ * echoes the value, nor a part of it, so a credential in it never reaches an error message: a
+ * scheme is named (`Unsupported scheme "ftp:"`) only when the value spells one (`<scheme>://`),
+ * since a scheme-less `user:password@host` parses with the user name as its scheme.
  */
 export function baseUrlProblem(value: unknown): string | undefined {
   if (typeof value !== "string") return "Expected an absolute http(s) URL.";
@@ -297,7 +299,11 @@ export function baseUrlProblem(value: unknown): string | undefined {
     return "Expected an absolute http(s) URL.";
   }
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`;
+    // `user:password@host` without a scheme parses as a URL whose scheme is the user name
+    // ("t0kens3cret:"), lower-cased, which the CLI's exact-string redaction can't match: name a
+    // scheme only when the value spells one, `<scheme>://`.
+    if (!/^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(value)) return "Expected an absolute http(s) URL.";
+    return `Unsupported scheme "${cutForMessage(url.protocol)}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
   // WHATWG reads a "\" in an http(s) URL as "/", so it ends the host: in

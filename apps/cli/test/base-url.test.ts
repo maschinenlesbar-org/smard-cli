@@ -134,3 +134,26 @@ test("requests go to the host of the parsed base URL, spelled as it parses, an @
     }
   }
 });
+
+test("a base URL typed without its scheme never names its user name, token or password, on either side (F5)", async () => {
+  // `T0kenS3cret:@h` parses as a URL whose scheme is the token, lower-cased: `Unsupported scheme
+  // "t0kens3cret:"` printed it on stderr, where no exact-string redaction matches it.
+  for (const [base, secrets] of [
+    ["T0kenS3cret:@127.0.0.1:9", ["T0kenS3cret", "t0kens3cret"]],
+    ["alice:s3cret@127.0.0.1:9", ["alice", "s3cret"]],
+    ["my_user:pw-S3cret@127.0.0.1:9", ["my_user", "pw-S3cret"]],
+    ["T0kenS3cret@127.0.0.1:9", ["T0kenS3cret", "t0kens3cret"]],
+  ] as const) {
+    assert.equal(baseUrlProblem(base), "Expected an absolute http(s) URL.", base);
+    const { cli, lib: l } = await parity(
+      ["--compact", "--base-url", base, "timestamps", "410", "DE", "hour"],
+      (transport) => new SmardClient({ transport, baseUrl: base }).timestamps(410, "DE", "hour"),
+      ok,
+    );
+    assert.equal(cli.code, 1, `${base}: ${cli.err}`);
+    assert.equal(cli.requests.length + l.requests.length, 0, base);
+    const message = (l as { error: Error }).error.message;
+    assert.equal(message, "Invalid baseUrl: Expected an absolute http(s) URL.", base);
+    for (const secret of secrets) assert.ok(!cli.err.includes(secret), `${base}: ${cli.err}`);
+  }
+});
