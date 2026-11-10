@@ -268,9 +268,11 @@ export function sanitizeServerText(text: string): string {
  *   but a custom transport may not, so a `file:`/`ftp:` base URL never reaches one);
  * - it has no query or fragment (request paths are appended to it as a string, so
  *   `http://h/?x=1` would request `/?x=1/app/...` and `http://h/#f` would request `/`);
- * - it has no surrounding whitespace (`new URL()` trims silently, but the engine
- *   appends request paths to the raw string, so a trailing space would request
- *   `/%20/app/...` on the mirror);
+ * - it has no backslash: WHATWG ends an http(s) host at one, as at a `/`, while text-based
+ *   code reads on, so `https://u:pw@a.example\@b.example` could be checked as one host and
+ *   its credentials sent to another;
+ * - it has no surrounding whitespace (`new URL()` trims silently, so the URL requested
+ *   would not be the one typed);
  * - it holds no control character (C0, TAB included, DEL, C1): `new URL()` drops an
  *   inner TAB, LF or CR silently, so `/p\nX` requested `/pX`, and an echo of the value
  *   would carry ESC to a terminal. One a path or password needs is written
@@ -278,7 +280,10 @@ export function sanitizeServerText(text: string): string {
  *
  * - a `%` in its userinfo starts a valid escape (`%25` for a literal one): Node decodes
  *   the userinfo into the Authorization header and would otherwise fail every request
- *   with "URI malformed".
+ *   with "URI malformed";
+ * - its scheme is followed by exactly `//` and the host (not `http:host`, `http:/host` or
+ *   `http:///host`): WHATWG skips any slashes and backslashes after an http(s) scheme and
+ *   repairs the URL silently, so the host requested would not be the one typed either.
  *
  * Userinfo (`https://user:pw@mirror`) is allowed and sent as Basic auth. No reason
  * echoes the value, so a credential in it never reaches an error message.
@@ -295,6 +300,9 @@ export function baseUrlProblem(value: unknown): string | undefined {
     return `Unsupported scheme "${url.protocol}". Expected an http(s) URL.`;
   }
   if (/[?#]/.test(value)) return "A base URL cannot have a query (?) or fragment (#).";
+  // WHATWG reads a "\" in an http(s) URL as "/", so it ends the host: in
+  // `https://u:pw@a.example\@b.example` every reader of the base URL has to agree where.
+  if (value.includes("\\")) return 'A base URL cannot contain a backslash (\\); write "/" instead.';
   if (value !== value.trim()) return "A base URL cannot have surrounding whitespace.";
   if (/[\u0000-\u001f\u007f-\u009f]/.test(value)) {
     return "A base URL cannot contain a control character (a tab, a line break, ESC, DEL); write one it needs percent-encoded, e.g. %09.";
@@ -308,16 +316,23 @@ export function baseUrlProblem(value: unknown): string | undefined {
       return 'The user name or password has a "%" that is not followed by two hex digits; write a literal "%" as %25.';
     }
   }
+  // WHATWG skips any slashes after "http:" and repairs `http:host`, `http:/host` and
+  // `http:///host` into `http://host` silently: the host requested would not be the one typed.
+  if (!/^https?:\/\/[^/]/i.test(value)) return 'Expected an absolute http(s) URL ("https://" and the host).';
   return undefined;
 }
 
 /**
- * Check a base URL against {@link baseUrlProblem} and return it without trailing
- * slashes; throws `SmardValidationError` (`Invalid baseUrl: <reason>`). This is a
+ * Check a base URL against {@link baseUrlProblem} and return it as WHATWG parses it
+ * (`URL#href`: the host lower-cased, a default port dropped, the path percent-encoded where
+ * WHATWG does it), without trailing slashes: requests go to the URL every check of it reads
+ * (the host, the cleartext warning), and a transport that reads the URL as text reaches the
+ * same host. Throws `SmardValidationError` (`Invalid baseUrl: <reason>`). This is a
  * configuration error, not a transport failure, so it is never a SmardNetworkError.
  */
 export function validateBaseUrl(raw: string): string {
-  return assertValid("baseUrl", raw, baseUrlProblem).replace(/\/+$/, "");
+  assertValid("baseUrl", raw, baseUrlProblem);
+  return new URL(raw).href.replace(/\/+$/, "");
 }
 
 /** True for a loopback host: `localhost`, 127.0.0.0/8 or `::1` (as URL#hostname spells it). */
@@ -481,12 +496,11 @@ export class RequestEngine {
     // Only `undefined` selects the default. An explicit blank or padded value is
     // rejected (SmardValidationError), as the CLI rejects it, rather than silently
     // meaning production or a different path on the mirror.
-    this.#baseUrl = options.baseUrl === undefined
-      ? DEFAULT_BASE_URL
-      : validateBaseUrl(options.baseUrl);
+    const typed = options.baseUrl === undefined ? DEFAULT_BASE_URL : options.baseUrl;
+    this.#baseUrl = validateBaseUrl(typed);
     // The userinfo as typed and as WHATWG sends it (it percent-encodes some of its characters,
     // and a server echoes the request URL in that spelling).
-    const userinfos = [...new Set([...credentialsIn(this.#baseUrl), ...credentialsIn(new URL(this.#baseUrl).href)])];
+    const userinfos = [...new Set([...credentialsIn(typed), ...credentialsIn(this.#baseUrl)])];
     this.#credentials = userinfos.flatMap((raw) => {
       try {
         return [raw, decodeURIComponent(raw)];

@@ -249,8 +249,15 @@ apps/cli/src/cli/
   fragment (`#`) (the API path is appended to it as a string), no surrounding
   whitespace, no control character (the URL parser drops an inner tab or line break
   silently, so another path would be requested; one a path or password needs is
-  written percent-encoded, `%09`), and no `%` in the userinfo that isn't an escape (a literal `%` is
-  written `%25`; Node would fail every request with "URI malformed"). The `RequestEngine` constructor throws a `SmardValidationError` for
+  written percent-encoded, `%09`), no `%` in the userinfo that isn't an escape (a literal `%` is
+  written `%25`; Node would fail every request with "URI malformed"), no backslash (WHATWG ends
+  an http(s) host at one, text-based code reads on: `https://u:pw@a.example\@b.example`), and
+  the scheme followed by exactly `//` and the host (`http:host`, `http:/host`, `http:///host`
+  are refused: WHATWG repairs them silently into another URL). `validateBaseUrl` returns the
+  URL as WHATWG parses it (`URL#href`: host lower-cased, a default port dropped), without
+  trailing slashes, and the engine requests that spelling, so a transport that reads the URL as
+  text reaches the host every check names. `credentialsIn` reads a special scheme's userinfo
+  after any slashes and backslashes, and ends it at a backslash too, as WHATWG does. The `RequestEngine` constructor throws a `SmardValidationError` for
   a bad base URL — a configuration error, not a `SmardNetworkError` — so a library
   caller's custom `Transport` never receives one, and the `--base-url` option
   parser (`parseBaseUrl`) calls the same rule to make it a usage error at parse
