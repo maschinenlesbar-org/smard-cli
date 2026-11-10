@@ -941,3 +941,27 @@ test("a base URL whose scheme is not followed by // and the host, or with a back
     assert.doesNotThrow(() => new RequestEngine({ transport: makeMockTransport(() => jsonResponse({})).transport, baseUrl }), baseUrl);
   }
 });
+
+// ---- REPORT.md, same class elsewhere: header text quoted in a SmardParseError ----
+
+test("the base URL's credential is scrubbed from a Content-Type or charset a parse error quotes", async () => {
+  const pw = "s3cret-Pw";
+  const base = `https://alice:${pw}@mirror.example`;
+  const basic = Buffer.from(`alice:${pw}`, "utf8").toString("base64");
+  for (const [body, contentType] of [
+    ["<html>", `text/${pw}`],
+    ["<html>", `text/alice:${pw}`],
+    ["<html>", `text/b${basic}`],
+    ["{}", `application/json; charset=${pw}`],
+    ["{}", `application/json; charset=x-${basic}`],
+  ] as const) {
+    const engine = new RequestEngine({ baseUrl: base, maxRetries: 0, transport: async () => rawResponse(body, contentType) });
+    const err = await engine.getJson("/x").then(
+      () => assert.fail(`${contentType}: accepted`),
+      (e: unknown) => e,
+    );
+    assert.ok(err instanceof SmardParseError, String(err));
+    assert.match(err.message, /Content-Type|charset/);
+    assert.ok(!err.message.includes(pw) && !err.message.includes(basic), err.message);
+  }
+});

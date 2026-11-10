@@ -813,7 +813,7 @@ export class RequestEngine {
   async getJson<T>(path: string, query?: QueryParams): Promise<T> {
     const res = await this.request("GET", path, { query, accept: "application/json" });
     const request = `GET ${this.describeUrl(path, query)}`;
-    const decoded = decodeBody(res.data, res.contentType, request);
+    const decoded = decodeBody(res.data, res.contentType, request, (text) => this.scrub(text));
     if (decoded.text.trim() === "") {
       // A broken answer, not "no data": printed as nothing with exit 0, it would let a script
       // carry on as if SMARD had nothing to say.
@@ -829,7 +829,9 @@ export class RequestEngine {
       // An HTML maintenance or proxy page is the usual non-JSON answer: name its type,
       // so it reads as an upstream problem rather than a client bug.
       const type = res.contentType.split(";")[0]?.trim() ?? "";
-      const hint = type !== "" && !/json/i.test(type) ? ` (expected JSON, got Content-Type "${cutForMessage(sanitizeServerText(type))}")` : "";
+      // Header text, as a server or a custom transport sent it: scrubbed of the base URL's
+      // credentials before it is cleaned and cut, like an error detail.
+      const hint = type !== "" && !/json/i.test(type) ? ` (expected JSON, got Content-Type "${cutForMessage(sanitizeServerText(this.scrub(type)))}")` : "";
       throw new SmardParseError(`${request}: the answer is not valid JSON${hint}.`, { cause: this.scrubCause(cause) });
     }
     // JSON.parse rounds and overflows numbers silently: refuse the answer rather than print a
@@ -896,17 +898,23 @@ export class RequestEngine {
  * none). TextDecoder drops a leading byte order mark, which Buffer#toString keeps and
  * JSON.parse then rejects, so a BOM added by a proxy cannot turn a valid answer into a
  * parse error; a Latin-1 body is no longer misread as UTF-8. An unknown charset label
- * is a SmardParseError naming `request` (`GET <url>`). Bytes that are not valid in the
+ * is a SmardParseError naming `request` (`GET <url>`), the label scrubbed of the base URL's
+ * credentials (`scrub`) before it is cleaned and cut. Bytes that are not valid in the
  * charset become U+FFFD, and `replaced` counts them: exactly for UTF-8 and the single-byte
  * charsets; for UTF-16 a U+FFFD the server sent counts too.
  */
-function decodeBody(body: Buffer, contentType: string, request: string): { text: string; replaced: number } {
+function decodeBody(
+  body: Buffer,
+  contentType: string,
+  request: string,
+  scrub: (text: string) => string,
+): { text: string; replaced: number } {
   const charset = /;\s*charset\s*=\s*"?([^";\s]+)"?/i.exec(contentType)?.[1] ?? "utf-8";
   let decoder: TextDecoder;
   try {
     decoder = new TextDecoder(charset, { fatal: true });
   } catch {
-    throw new SmardParseError(`${request}: unsupported response charset "${cutText(sanitizeServerText(charset), 100)}".`);
+    throw new SmardParseError(`${request}: unsupported response charset "${cutText(sanitizeServerText(scrub(charset)), 100)}".`);
   }
   try {
     return { text: decoder.decode(body), replaced: 0 };

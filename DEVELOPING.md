@@ -415,7 +415,8 @@ either side, reads the same way and stays a `SmardResponseTooLargeError`.
 The base URL lives in a real `#private` field of the engine, so `console.log`,
 `util.inspect` and `JSON.stringify` of a client never show its password, and the
 engine scrubs the base URL's userinfo (raw and percent-decoded) from error bodies,
-details, transport error text and the `cause` chain
+details, transport error text, the Content-Type or charset label a parse error quotes, and
+the `cause` chain
 (`apps/cli/test/conformance-p2-library-redaction.test.ts`) — and with it the forms a server
 echoes it back in (`echoedCredentialForms`, exported): the `Authorization: Basic` value,
 the decoded `user:password`, and the password alone from 4 characters on (for a userinfo
