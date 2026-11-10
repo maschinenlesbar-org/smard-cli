@@ -425,7 +425,14 @@ use is a validation error too. Echoed values, server text (an API `detail`) and 
 message names (the request URL, the default transport's refused URL) are
 cut at `MAX_MESSAGE_VALUE_LENGTH` (500) characters with `cutForMessage`, never inside a
 surrogate pair (`cutText`), so the message stays well-formed; `SmardApiError.body` keeps
-the full text.
+the full text. Server text in a message (a `detail`, a transport's error text, a Content-Type or
+charset label) is cleaned by `sanitizeServerText` (engine.ts): it reads at most the first 16 384
+characters, drops whole terminal escape sequences (CSI, OSC and the other control strings), then
+the remaining C0/C1 controls, DEL and every format character (Cf: bidi controls, zero-width
+characters), and folds whitespace runs into one space — each step a linear regex replace, so a
+hostile error body costs neither seconds nor the heap. The repair of lone surrogate escapes and
+the quoting of declared big integers (`scanNumbers`) build their text with `TextBuilder`
+(errors.ts), not one `+=` per piece.
 `apps/cli/test/conformance-p8-p9-p13-responses-and-errors.test.ts` holds the shared checks
 for the declared charset (P8), 2xx bodies without the documented shape (P9) and
 wrong-typed input (P13).
