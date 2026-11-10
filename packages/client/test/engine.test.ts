@@ -668,19 +668,7 @@ test("sanitizeServerText reads a bounded prefix and drops what the per-character
   assert.equal(sanitizeServerText(`a${ESC}]0;x${ESC}]0;t${BEL}b`), "a0;xb");
 });
 
-test("an error detail of unterminated control-string introducers is cleaned in linear time", async () => {
-  // The control-string body admitted the introducers that start it: an unterminated run of them
-  // was matched from each one to the end (100 000 x U+009D took 16 s).
-  for (const intro of ["\u009d", "\u0090", "\u0098", "\u009e", "\u009f", `${ESC}]`]) {
-    const engine = new RequestEngine({ transport: async () => jsonResponse({ detail: intro.repeat(100_000) }, 500) });
-    const start = performance.now();
-    await assert.rejects(engine.getJson("/x"), SmardApiError);
-    const ms = performance.now() - start;
-    assert.ok(ms < 1000, `${Math.round(ms)} ms for ${JSON.stringify(intro)}`);
-  }
-});
-
-// These tests start a process with a small heap: 30 s instead of the suite's 5 s.
+// This test starts a process with a small heap: 30 s instead of the suite's 5 s.
 const STARTS_A_PROCESS = { timeout: 30_000 };
 
 test("scanNumbers quotes millions of declared members within a small heap", STARTS_A_PROCESS, () => {
@@ -693,20 +681,6 @@ test("scanNumbers quotes millions of declared members within a small heap", STAR
     `process.stdout.write(String(scanNumbers(json, new Set(["k"])).json.length));`;
   const out = execFileSync(process.execPath, ["--max-old-space-size=128", "--input-type=module", "-e", script], { encoding: "utf8" });
   assert.equal(out, String(n * 10 + 1));
-});
-
-test("an answer of millions of lone surrogate escapes is repaired within a small heap", STARTS_A_PROCESS, () => {
-  // One `+=` per repair made a rope node each: 6 million repairs exhausted a 128 MB heap.
-  const engine = new URL("../src/engine.js", import.meta.url).href;
-  const n = 6_000_000;
-  const script =
-    `const { RequestEngine } = await import(${JSON.stringify(engine)});` +
-    `const body = Buffer.from('"' + "\\\\ud800".repeat(${n}) + '"');` +
-    `const e = new RequestEngine({ transport: async () => ({ status: 200, headers: { "content-type": "application/json" }, body }) });` +
-    `const got = await e.getJson("/x");` +
-    `process.stdout.write(String(got.length));`;
-  const out = execFileSync(process.execPath, ["--max-old-space-size=128", "--input-type=module", "-e", script], { encoding: "utf8" });
-  assert.equal(out, String(n));
 });
 
 // ---- class D: a credential scrubbed from decoded server text ----

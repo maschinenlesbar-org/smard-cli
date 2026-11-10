@@ -596,7 +596,15 @@ everything that drives the CLI is in `apps/cli/test/`.
   within a small heap; a lone surrogate or invalid bytes become U+FFFD with a `WARN` record of
   `smard.api`), P26 output integrity (stdout redirected to a file and
   cut short is an `ERROR` record of `smard.output`, exit 1; its `-o` tests are skipped,
-  `HAS_OUTPUT_OPTION = false`: smard writes no files).
+  `HAS_OUTPUT_OPTION = false`: smard writes no files), and from the security audit of
+  2026-10-27: P28 hostile error answers (a long zero run in a number, unterminated
+  control-string introducers, a 16 MB error message and millions of lone surrogate escapes are
+  handled in linear time and a small heap; a credential echoed with JSON escapes or in a
+  redirect's Location is scrubbed; `quotedBody` is undefined, as smard quotes no server value,
+  and `REDIRECT_ERROR` is `HTTP 302`, as it follows none), P29 base-URL credentials (a token
+  userinfo scrubbed, a backslash or a repaired scheme refused, requests to the parsed host,
+  linear stdout redaction), P30 output links (all skipped: no `-o`) and P31 the release
+  pipeline (`release.yml`'s three jobs, the SBOM tool locked in `tools/sbom/`).
 
 ## Continuous integration
 

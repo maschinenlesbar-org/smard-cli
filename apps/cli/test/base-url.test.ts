@@ -90,51 +90,6 @@ test("parity: a bad --base-url / baseUrl gives the same reason on both sides, wi
   }
 });
 
-test("a backslash or a repaired scheme in --base-url is refused on both sides, never echoing the password", async () => {
-  const pw = "s3cret-Pw";
-  for (const base of [
-    `https://alice:${pw}@api.example\\@evil.example`,
-    `http://alice:${pw}@127.0.0.1\\@evil.example`,
-    `http:alice:${pw}@127.0.0.1:9`,
-    `http:/alice:${pw}@127.0.0.1:9`,
-    `http:///alice:${pw}@127.0.0.1:9`,
-    `HTTPS:alice:${pw}@mirror.example`,
-    `https:\\\\alice:${pw}@mirror.example`,
-    `http:///alice:${pw}@mirror.example/?q=1`,
-  ]) {
-    const { cli, lib: l } = await parity(
-      ["--compact", "--base-url", base, "timestamps", "410", "DE", "hour"],
-      (transport) => new SmardClient({ transport, baseUrl: base }).timestamps(410, "DE", "hour"),
-      ok,
-    );
-    assert.equal(cli.code, 1, `${base}: ${cli.err}`);
-    assert.equal(cli.requests.length + l.requests.length, 0, base);
-    assert.ok(!l.ok && l.error instanceof SmardValidationError, base);
-    assert.ok(!(l.error as Error).message.includes(pw), (l.error as Error).message);
-    assert.ok(!cli.err.includes(pw) && !cli.out.includes(pw), cli.err);
-  }
-});
-
-test("requests go to the host of the parsed base URL, spelled as it parses, an @ in its path included", async () => {
-  for (const base of ["https://alice:pw@api.example/v1/@evil.example", "https://API.Example:443/v1"]) {
-    const parsed = new URL(base);
-    const { cli, lib: l } = await parity(
-      ["--compact", "--base-url", base, "timestamps", "410", "DE", "hour"],
-      (transport) => new SmardClient({ transport, baseUrl: base }).timestamps(410, "DE", "hour"),
-      ok,
-    );
-    assert.equal(cli.requests.length, 1, cli.err);
-    assert.ok(l.ok);
-    for (const req of [...cli.requests, ...l.requests]) {
-      assert.equal(new URL(req.url).origin, parsed.origin, `${base}: ${req.url}`);
-      // The URL as sent names that host in the text too, so a transport that reads the string
-      // (not the parsed URL) reaches the same host.
-      const authority = req.url.slice(req.url.indexOf("//") + 2).split("/")[0] ?? "";
-      assert.ok(authority === parsed.host || authority.endsWith(`@${parsed.host}`), `${base}: ${req.url}`);
-    }
-  }
-});
-
 test("a base URL typed without its scheme never names its user name, token or password, on either side (F5)", async () => {
   // `T0kenS3cret:@h` parses as a URL whose scheme is the token, lower-cased: `Unsupported scheme
   // "t0kens3cret:"` printed it on stderr, where no exact-string redaction matches it.
