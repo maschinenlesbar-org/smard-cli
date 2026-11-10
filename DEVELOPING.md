@@ -262,7 +262,9 @@ apps/cli/src/cli/
   caller's custom `Transport` never receives one, and the `--base-url` option
   parser (`parseBaseUrl`) calls the same rule to make it a usage error at parse
   time. The default transport (`http.ts`) still checks the scheme of every request
-  URL (`SmardNetworkError`). Userinfo (`https://user:pw@mirror`) is kept and sent
+  URL (`SmardNetworkError`); its message shows the URL with the userinfo redacted, one typed
+  without its scheme (`user:pw@host`, `TOKEN:@host`) included, and names a protocol only
+  when the URL spells `<scheme>://`. Userinfo (`https://user:pw@mirror`) is kept and sent
   as Basic auth, but `redactUrl` shows it as `***` in every error message and in
   `SmardApiError.url`, and no base-URL rejection echoes the value or a part of it (a scheme is
   named only when the value spells `<scheme>://`: a scheme-less `TOKEN:@host` parses with the
