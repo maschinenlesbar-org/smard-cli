@@ -366,7 +366,9 @@ seconds, ms under 1 s). Tests: `apps/cli/test/retry-log.test.ts`.
 **maxResponseBytes.** A hard cap (default 100 MiB; `0` = unlimited) on response
 body size, defending against memory exhaustion; a breach aborts the request with
 `SmardResponseTooLargeError`, whose message names `maxResponseBytes` and
-`--max-response-bytes`.
+`--max-response-bytes`. The default transport joins small chunks as they arrive (at most 1024
+or 64 KiB unjoined), so the memory an answer holds follows its bytes, not the number of chunks a
+server sends it in.
 
 **The transport contract (engine-enforced).** The engine holds the documented
 limits for any transport, not only the built-in one
@@ -589,8 +591,9 @@ everything that drives the CLI is in `apps/cli/test/`.
   corpus (a data file's value: a number JSON can't carry exactly or an empty answer is an
   error, exit 1; a subnormal that prints changed too; the error names the request), P27 big
   and odd answers (a large flat answer and one of DEL characters print within a small heap,
-  or are "too large" past V8's longest string; a lone surrogate or invalid bytes become U+FFFD
-  with a `WARN` record of `smard.api`), P26 output integrity (stdout redirected to a file and
+  or are "too large" past V8's longest string; an answer in two million one-byte chunks is read
+  within a small heap; a lone surrogate or invalid bytes become U+FFFD with a `WARN` record of
+  `smard.api`), P26 output integrity (stdout redirected to a file and
   cut short is an `ERROR` record of `smard.output`, exit 1; its `-o` tests are skipped,
   `HAS_OUTPUT_OPTION = false`: smard writes no files).
 
