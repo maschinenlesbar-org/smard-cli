@@ -19,7 +19,9 @@ import {
   SmardResponseTooLargeError,
   SmardValidationError,
   TextBuilder,
+  credentialsIn,
   cutText,
+  echoedCredentialForms,
   redactUrlUserinfo,
   toWellFormed,
 } from "../src/errors.js";
@@ -850,5 +852,36 @@ test("a credential a server percent-encodes itself is scrubbed (the user:passwor
     const err = await engine.getJson("/x").catch((caught: unknown) => caught);
     assert.ok(err instanceof SmardApiError, String(err));
     for (const text of [err.message, err.detail ?? "", err.body]) assert.ok(!text.includes(form), `${form}: ${text}`);
+  }
+});
+
+// ---- class E: a userinfo without a password is a token ----
+
+test("echoedCredentialForms treats a userinfo without a password as a token (Basic `TOKEN:`)", () => {
+  const basic = (pair: string): string => Buffer.from(pair, "utf8").toString("base64");
+  assert.deepEqual(echoedCredentialForms("alice:s3cret"), [basic("alice:s3cret"), "alice:s3cret", "s3cret"]);
+  assert.deepEqual(echoedCredentialForms("T0ken"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T0ken:"), [basic("T0ken:"), "T0ken:", "T0ken"]);
+  assert.deepEqual(echoedCredentialForms("T%C3%B6k"), [basic("Tök:"), "Tök:"]); // short: not alone
+  assert.deepEqual(echoedCredentialForms(":pw12"), [basic(":pw12"), ":pw12", "pw12"]);
+  assert.deepEqual(echoedCredentialForms(""), []);
+  assert.deepEqual(echoedCredentialForms(":"), []);
+});
+
+test("a token as the base URL's userinfo is scrubbed from library errors in every echoed form", async () => {
+  const token = "T0kenS3cret";
+  const basic = Buffer.from(`${token}:`, "utf8").toString("base64");
+  for (const base of [`https://${token}@mirror.example`, `https://${token}:@mirror.example`]) {
+    assert.deepEqual(credentialsIn(base).length, 1);
+    for (const echo of [`bad token ${token}`, `Authorization: Basic ${basic}`, `user ${token}: unknown`]) {
+      const engine = new RequestEngine({ baseUrl: base, maxRetries: 0, transport: async () => jsonResponse({ detail: echo }, 401) });
+      const err = await engine.getJson("/x").then(
+        () => assert.fail("the call should have failed"),
+        (e: unknown) => e,
+      );
+      const seen = everything(err);
+      assert.ok(err instanceof SmardApiError, String(err));
+      assert.ok(!seen.includes(token) && !seen.includes(basic), `${base} ${echo}: ${seen.slice(0, 2000)}`);
+    }
   }
 });

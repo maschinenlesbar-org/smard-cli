@@ -405,7 +405,9 @@ engine scrubs the base URL's userinfo (raw and percent-decoded) from error bodie
 details, transport error text and the `cause` chain
 (`apps/cli/test/conformance-p2-library-redaction.test.ts`) — and with it the forms a server
 echoes it back in (`echoedCredentialForms`, exported): the `Authorization: Basic` value,
-the decoded `user:password`, and the password alone from 4 characters on
+the decoded `user:password`, and the password alone from 4 characters on (for a userinfo
+without a password, `https://TOKEN@host`, the user name is the secret: `TOKEN:`, its Basic
+value and the token itself)
 (`redactSecrets`, exported), each also percent-encoded as in a URL. The userinfo is taken as
 typed and as WHATWG sends it in the request URL. An error's `detail` is decoded text and is
 scrubbed again after `JSON.parse`, before it is cleaned and cut: a JSON escape (`\"`, `\u00e4`,
