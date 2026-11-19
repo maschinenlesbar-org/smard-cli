@@ -721,7 +721,7 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
     return {
       status: "empty",
       searched,
-      reason: `No day-ahead prices for ${label} yet${until === undefined ? "" : ` (published until ${until})`}. The next day's prices come after the noon auction, on SMARD in the afternoon; ask for today or an earlier day.`,
+      reason: `No day-ahead prices for ${label} yet${until === undefined ? "" : ` (published until ${until})`}. The next day's prices are set in the noon auction; SMARD publishes some zones (DE-LU among them) hours later, at times only late in the evening. Ask for today or an earlier day, or ask again later.`,
     };
   }
 
