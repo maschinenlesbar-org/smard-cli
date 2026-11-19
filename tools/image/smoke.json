@@ -1,0 +1,12 @@
+{
+  "comment": "What tools/image/smoke.mjs needs that is particular to this repo: the bin (its log topic), a command that makes one request, the exit code of a network error, the mock's answer to that request (by path, under --base-url http://mock:8080; the client adds /app/chart_data), and a string the printed answer contains. The answer is the live index of the hourly grid load, recorded on 2026-11-19 and cut to its last four weeks.",
+  "bin": "smard",
+  "command": ["timestamps", "410", "DE", "hour"],
+  "networkErrorExit": 1,
+  "answers": {
+    "/app/chart_data/410/DE/index_hour.json": {
+      "timestamps": [1792969200000, 1793574000000, 1794178800000, 1794783600000]
+    }
+  },
+  "expectStdout": "1794783600000"
+}
