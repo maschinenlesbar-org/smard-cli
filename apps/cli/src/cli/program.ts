@@ -13,6 +13,7 @@ import { MAX_RETRIES } from "@maschinenlesbar.org/smard-client/internal/engine";
 import { once, parseBaseUrl, parseBoundedInt, parseHeaderValue, parseIntArg } from "./shared.js";
 import { registerChartCommands } from "./commands/chart.js";
 import { registerCatalogueCommands } from "./commands/catalogue.js";
+import { readContainerLimits } from "./limits.js";
 import { DEFAULT_LOG_FORMAT, logFormatProblem } from "./log.js";
 
 /**
@@ -37,6 +38,8 @@ export const VERSION = readVersion();
 export const defaultDeps: CliDeps = {
   io: defaultIO,
   createClient: (options) => new SmardClient(options),
+  // In a container: the memory and pids limits (cgroup), for action()'s checks.
+  limits: () => readContainerLimits(),
 };
 
 /** commander value-parser for `--log-format`. */

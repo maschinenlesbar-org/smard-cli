@@ -3,7 +3,9 @@
 
 import type { Command } from "commander";
 import { InvalidArgumentError } from "commander";
+import { pidsProblem, responseCapFor } from "./limits.js";
 import { logOf, type CliDeps } from "./io.js";
+import { SmardError } from "@maschinenlesbar.org/smard-client/internal/errors";
 import { assertArgument, assertValid, headerValueProblem, nonNegativeIntegerProblem, tokenProblem } from "@maschinenlesbar.org/smard-client/internal/validate";
 import { DEFAULT_BASE_URL, baseUrlProblem, cleartextProblem, type EngineOptions, type RetryEvent } from "@maschinenlesbar.org/smard-client/internal/engine";
 
@@ -178,6 +180,9 @@ export interface ActionOptions<A> {
   parse?: (positionals: string[]) => A;
 }
 
+/** The container can't run the CLI as it is limited (limits.ts): an ERROR record of the cli area and exit 1. */
+export class EnvironmentError extends SmardError {}
+
 /**
  * Wrap an async command action with consistent global-option resolution and
  * client construction. The callback receives a context (client + resolved global
@@ -209,6 +214,15 @@ export function action<A = string[]>(
     const cleartext = options.makesRequests === false ? undefined : cleartextProblem(global.baseUrl ?? DEFAULT_BASE_URL);
     if (cleartext !== undefined) logOf(deps).warn("http", cleartext);
     const engineOptions = toEngineOptions(global);
+    // In a container: under a pids limit Node can't work with, refuse before any request; under a
+    // memory limit the 100 MiB default can't be held, so cap by the memory instead (an oversized
+    // answer is then the cap's error, not an OOM kill). An explicit --max-response-bytes wins.
+    const limits = deps.limits?.() ?? {};
+    const problem = pidsProblem(limits);
+    if (problem !== undefined) throw new EnvironmentError(problem);
+    const given = command.getOptionValueSourceWithGlobals("maxResponseBytes");
+    const memory = given === undefined || given === "default" ? limits.memoryBytes : undefined;
+    if (memory !== undefined) engineOptions.maxResponseBytes = responseCapFor(memory);
     engineOptions.onRetry = (event) => logOf(deps).warn("http", retryMessage(event));
     // An answer delivered changed (invalid text replaced with U+FFFD) is never silent.
     engineOptions.onWarning = (message) => logOf(deps).warn("api", message);
