@@ -35,6 +35,54 @@ Check it works:
 smard --help
 ```
 
+### Docker
+
+From 0.9.0 every release is also a container image for linux/amd64 and linux/arm64 on the
+GitHub Container Registry, made from the same tarball as the npm package. It needs no Node.js and no
+install:
+
+```bash
+docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+  ghcr.io/maschinenlesbar-org/smard-cli:latest latest 4169 DE-LU hour
+```
+
+The image's entrypoint is the program, so the command follows the image name directly;
+`… smard-cli:latest smard latest 4169 DE-LU hour` works too.
+
+In a container with a memory limit (`--memory`) the default `--max-response-bytes` is an eighth
+of that limit (at most the usual 100 MiB), so an oversized answer is refused with a clear
+error instead of the container being killed for memory. SMARD's files are small: a week of
+quarter-hours is about 20 KB.
+The CLI needs at least 12 processes and threads (`--pids-limit 12`): below that it refuses with
+an error, and with 4 or fewer Node.js itself hangs before the CLI can check.
+
+`latest` is the newest release. For scripts, name a release and pin its digest, which the
+[release notes](https://github.com/maschinenlesbar-org/smard-cli/releases) give:
+`…/smard-cli:0.9.0@sha256:<digest>`. Each image carries signed build provenance;
+check it with
+
+```bash
+gh attestation verify oci://ghcr.io/maschinenlesbar-org/smard-cli:latest \
+  --repo maschinenlesbar-org/smard-cli
+```
+
+### MCP server
+
+From 0.9.0 the same data is also an [MCP](https://modelcontextprotocol.io/) server for AI agents,
+`@maschinenlesbar.org/smard-mcp` (command `smard-mcp`, image
+`ghcr.io/maschinenlesbar-org/smard-mcp`): five read-only tools, the generation mix and renewable
+share for a period, the day-ahead prices (the price now, the day's cheapest and dearest slots,
+bidding zones compared), one series over a date range as rows for a table or CSV, the series
+catalogue and the windows a series is published in, with SMARD's traps handled (the unpublished
+null tail, Berlin calendar periods, nuclear ended in April 2023, the current price not the last
+published one), on stdio or Streamable HTTP. Setup for Claude Code, Claude Desktop and VS Code:
+[MCP.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/MCP.md).
+
+```bash
+npm i -g @maschinenlesbar.org/smard-mcp
+claude mcp add smard -- smard-mcp
+```
+
 ## Quickstart
 
 No setup needed — the API requires no key. Your first query:
@@ -238,6 +286,7 @@ These apply to every command and may be given before *or* after it, each at most
 - **[Usage.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/Usage.md)** — full use-case-driven cookbook.
 - **[GLOSSARY.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/GLOSSARY.md)** — every domain term, filter group, region code, and data shape explained.
 - **[DEVELOPING.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/DEVELOPING.md)** — TypeScript library usage, architecture, testing, CI.
+- **[MCP.md](https://github.com/maschinenlesbar-org/smard-cli/blob/main/MCP.md)** — the MCP server: tools, setup, options.
 
 ## Data license
 
