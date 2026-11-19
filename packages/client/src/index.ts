@@ -50,3 +50,44 @@ export {
 export { filtersByGroup, filterGroupProblem } from "./catalogue.js";
 export * from "./enums.js";
 export * from "./types.js";
+
+// The skills' use cases (generation mix, prices, a series over a range) and the listings behind them.
+export {
+  berlinDate,
+  berlinTime,
+  fold,
+  fromBerlin,
+  getGenerationMix,
+  getPrices,
+  getSeries,
+  listSeries,
+  listWindows,
+  parseTime,
+  periodLabel,
+  resolveRegion,
+  resolveResolution,
+  PRICE_ZONES,
+  REGIONS,
+  SERIES_INFO,
+  WINDOW_SPANS,
+} from "./operations.js";
+export type {
+  Ambiguous,
+  Empty,
+  GenerationMix,
+  GenerationMixInput,
+  MixSource,
+  PriceAt,
+  Prices,
+  PricesInput,
+  SeriesExport,
+  SeriesFile,
+  SeriesInfo,
+  SeriesInput,
+  SeriesKind,
+  SeriesList,
+  SeriesRow,
+  TimeSpan,
+  WindowList,
+  ZonePrices,
+} from "./operations.js";
