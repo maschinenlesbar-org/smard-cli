@@ -45,6 +45,22 @@ test("rejects an unsupported protocol with SmardNetworkError", async () => {
   );
 });
 
+test("a request its caller aborts says so, not that it hit a deadline; the engine's own deadline keeps its text", async () => {
+  await withServer(
+    () => {},
+    async (baseUrl) => {
+      const caller = new AbortController();
+      const pending = nodeHttpTransport({ method: "GET", url: baseUrl, timeoutMs: 30_000, signal: caller.signal });
+      setTimeout(() => caller.abort(), 20);
+      await assert.rejects(pending, (err) => err instanceof SmardNetworkError && /aborted by its caller/.test(err.message) && !/deadline|timed out/.test(err.message));
+      const engine = new AbortController();
+      const timed = nodeHttpTransport({ method: "GET", url: baseUrl, timeoutMs: 30_000, signal: engine.signal });
+      setTimeout(() => engine.abort(new SmardNetworkError("Request timed out after 50ms")), 20);
+      await assert.rejects(timed, (err) => err instanceof SmardNetworkError && err.message === "Request timed out after 50ms");
+    },
+  );
+});
+
 test("timeoutMs bounds the whole response, not just idle gaps", async () => {
   // A server that trickles a byte every 50 ms for 2 s never goes idle for the timeout.
   await withServer(

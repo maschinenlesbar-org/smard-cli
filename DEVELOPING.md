@@ -391,7 +391,10 @@ server sends it in.
 limits for any transport, not only the built-in one
 (`apps/cli/test/conformance-p5-transport-contract.test.ts`): it runs every call under the
 `timeoutMs` deadline and passes an `AbortSignal` in `HttpRequest.signal` (a `fetch`
-transport hands it on; the call rejects at the deadline either way), checks
+transport hands it on; the call rejects at the deadline either way; the engine aborts it with its
+timeout error, and the built-in transport fails with that text, while a signal a caller added
+aborting, as the MCP server's call deadline does, is "Request aborted by its caller before it
+finished", never a deadline that didn't fire), checks
 `maxResponseBytes` on the body a transport returns, reads headers from a plain
 object in any case, a `fetch` `Headers` or a `Map`, accepts any `ArrayBuffer` view
 or `ArrayBuffer` as the body (by internal slot, so from any realm), and turns a
