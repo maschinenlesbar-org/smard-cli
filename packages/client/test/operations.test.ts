@@ -265,6 +265,19 @@ test("a year or month in at without a resolution reads that year or month; with 
   }
 });
 
+test("a source that stopped publishing doesn't hold the mix back: the others are read at their newest period, it is missing and named", async () => {
+  const recorded = SERIES["1228/DE/day"] as RecordedSeries;
+  const [first, step, values] = recorded.windows[String(DAY_2026)] as [number, number, (number | null)[]];
+  const stalled: RecordedSeries = { index: recorded.index, windows: { [String(DAY_2026)]: [first, step, values.map((v, i) => (i < 5 ? v : null))] } };
+  const mix = await getGenerationMix(api({ "1228/DE/day": stalled }).client);
+  assert.equal(mix.status, "ok");
+  if (mix.status !== "ok") return;
+  assert.equal(mix.period.label, "2026-11-18");
+  assert.deepEqual(mix.behind, [{ id: 1228, name: "Sonstige Erneuerbare", newest: "2026-11-05", stalled: true }]);
+  assert.deepEqual(mix.missing, [{ id: 1228, name: "Sonstige Erneuerbare" }]);
+  assert.match(mix.notes.join(" "), /Sonstige Erneuerbare \(newest 2026-11-05\) published nothing since: left out of 2026-11-18, the newest period the others have/);
+});
+
 // --- getPrices ---
 
 test("the current price is the slot running now, not the last published one; the day's low and high with their times", async () => {

@@ -533,6 +533,9 @@ const candidatesOf = (list: readonly SeriesInfo[]) => list.map((s) => ({ id: s.i
 const MIX_SOURCES = [1223, 4069, 4071, 1227, 1224, 4067, 1225, 4068, 4066, 1226, 1228];
 const PUMPED_STORAGE = 4070;
 const NUCLEAR = 1224;
+/** A source more periods than this behind the newest has stopped publishing (it is missing, not waited for). */
+const STALLED_PERIODS = 2;
+
 /** How many files the mix reads at a time. */
 const MIX_PARALLEL = 2;
 
@@ -603,8 +606,11 @@ export interface GenerationMix {
   missing: { id: number; name: string }[];
   /** Sources (and pumped storage) SMARD publishes no series of for the region (a 404 for the index): the total is without them. */
   absent: { id: number; name: string }[];
-  /** Sources whose newest settled value is older than the others': every source is read at their period. */
-  behind: { id: number; name: string; newest: string }[];
+  /**
+   * Sources whose newest settled value is older than the others': every source is read at their
+   * period; one more than two periods behind (stalled) is not waited for, it is missing.
+   */
+  behind: { id: number; name: string; newest: string; stalled?: true }[];
   notes: string[];
   searched: Record<string, unknown>;
   /** The window file the period is in, for `source`. */
@@ -693,11 +699,16 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
       if (settled !== undefined) newest.set(id, settled[0]);
     });
     if (newest.size === 0) return { status: "empty", searched, reason: `No source has settled ${resolution} data in region ${region} yet.` };
-    target = Math.min(...newest.values());
+    // A source more than STALLED_PERIODS behind the newest has stopped publishing: it doesn't hold
+    // the others back (a default answer months old), it is missing at their period.
     const latest = Math.max(...newest.values());
-    if (latest > target) {
-      for (const [id, ts] of newest) if (ts < latest) behind.push({ id, name: info(id).name, newest: periodLabel(ts, resolution) });
-    }
+    const late = (ts: number): boolean => {
+      let next = ts;
+      for (let i = 0; i < STALLED_PERIODS; i++) next = nextPeriod(next, resolution);
+      return next < latest;
+    };
+    target = Math.min(...[...newest.values()].filter((ts) => !late(ts)));
+    for (const [id, ts] of newest) if (ts < latest) behind.push({ id, name: info(id).name, newest: periodLabel(ts, resolution), ...(late(ts) ? { stalled: true } : {}) });
   }
 
   if (!ids.includes(NUCLEAR)) ended.push({ id: NUCLEAR, name: info(NUCLEAR).name, note: "Germany's last reactors went offline on 15 April 2023; SMARD's series has no live values since, so it is left out." });
@@ -728,7 +739,10 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
   const notes: string[] = [];
   const gone = absentOnes().filter((a) => a.id !== PUMPED_STORAGE);
   if (gone.length > 0) notes.push(`SMARD publishes no ${gone.map((a) => a.name).join(", ")} series for region ${region} (HTTP 404): the total and the shares are without ${gone.length === 1 ? "it" : "them"}.`);
-  if (behind.length > 0) notes.push(`${behind.map((b) => `${b.name} (newest ${b.newest})`).join(", ")} ${behind.length === 1 ? "lags" : "lag"} behind the others; every source is read at ${label}, the newest period all have.`);
+  const lagging = behind.filter((b) => b.stalled !== true);
+  const stalled = behind.filter((b) => b.stalled === true);
+  if (lagging.length > 0) notes.push(`${lagging.map((b) => `${b.name} (newest ${b.newest})`).join(", ")} ${lagging.length === 1 ? "lags" : "lag"} behind the others; every source is read at ${label}, the newest period all have.`);
+  if (stalled.length > 0) notes.push(`${stalled.map((b) => `${b.name} (newest ${b.newest})`).join(", ")} published nothing since: left out of ${label}, the newest period the others have.`);
   if (missing.length > 0) notes.push(`${missing.map((m) => m.name).join(", ")}: no value for ${label} yet; the total and the shares are without ${missing.length === 1 ? "it" : "them"}.`);
   if (at !== undefined && spanned !== undefined && nextPeriod(target, resolution) < at.end) {
     notes.push(`${input.at} spans more than one ${resolution}: this is its first, ${label}. For all of it, ask with resolution ${spanned}.`);
