@@ -375,6 +375,23 @@ test("just after Monday midnight, a zone whose new week isn't listed yet has no 
   assert.deepEqual(prices.comparison?.notIncluded, ["DE-LU"]);
 });
 
+test("a day before a zone's prices begin says when they begin, never 'not published yet, ask again later'", async () => {
+  const before = await getPrices(api().client, { now: NOW, day: "2026-10-20" });
+  assert.equal(before.status, "empty");
+  if (before.status === "empty") {
+    assert.match(before.reason, /SMARD's day-ahead prices begin on 2026-10-26 for DE-LU \(the first week it lists\): there are none for 2026-10-20/);
+    assert.doesNotMatch(before.reason, /yet|later/);
+  }
+  const de = SERIES["4169/DE-LU/quarterhour"] as RecordedSeries;
+  const fr: SeriesOverrides = {
+    "254/DE-LU/quarterhour": { ...(SERIES["254/DE-LU/quarterhour"] as RecordedSeries), index: [1794783600000] },
+    "4169/DE-LU/quarterhour": { index: de.index, windows: { ...de.windows, "1793574000000": [1793574000000, 900_000, [null, null]] } },
+  };
+  const mixed = await getPrices(api(fr).client, { now: NOW, day: "2026-11-02", zones: ["DE-LU", "FR"] });
+  assert.equal(mixed.status, "empty");
+  if (mixed.status === "empty") assert.match(mixed.reason, /SMARD has no day-ahead prices for 2026-11-02 in DE-LU \(its file of that week has none\); FR's begin on 2026-11-16/);
+});
+
 test("a zone name several zones fit is ambiguous; an unknown zone or a non-price id is refused before any request", async () => {
   const denmark = await getPrices(api().client, { now: NOW, zones: ["Dänemark"] });
   assert.equal(denmark.status, "ambiguous");

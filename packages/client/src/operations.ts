@@ -876,6 +876,8 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
   const results: ZonePrices[] = [];
   const dayPoints = new Map<string, [number, number][]>();
   const currents = new Map<string, [number, number]>();
+  /** Where each zone's series begins (its first window), for a day before it. */
+  const begins = new Map<string, number>();
   let firstWindow: number | undefined;
   const upstream = new Upstream(client);
   for (const zone of zones) {
@@ -891,6 +893,7 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
     }
     const newest = starts[starts.length - 1];
     if (newest === undefined) continue;
+    begins.set(result.zone, starts[0] as number);
     // The day lies in one window (Monday to Sunday, Berlin time).
     const window = await reader.windowAt(day.start);
     firstWindow ??= window ?? newest;
@@ -920,18 +923,33 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
 
   const label = berlinDate(day.start);
   const firstZone = zones[0] as SeriesInfo;
+  // A zone without prices for the day: not published yet (today or later), its series begins after
+  // the day, or SMARD's file of that week has none.
+  const unpublished = results.filter((r) => !r.published);
+  const today = berlinFields(now.getTime());
+  const later = day.start >= fromBerlin(today.year, today.month, today.day);
+  const beginsAfter = unpublished.filter((r) => (begins.get(r.zone) ?? -Infinity) >= day.end);
+  const none = later ? [] : unpublished.filter((r) => !beginsAfter.includes(r));
+  const said: string[] = [];
+  if (none.length > 0) said.push(`SMARD has no day-ahead prices for ${label} in ${none.map((r) => r.zone).join(", ")} (its file of that week has none)`);
+  if (beginsAfter.length > 0) {
+    const first = beginsAfter.map((r) => `${berlinDate(begins.get(r.zone) as number)} for ${r.zone}`);
+    said.push(none.length > 0 ? beginsAfter.map((r) => `${r.zone}'s begin on ${berlinDate(begins.get(r.zone) as number)}`).join(", ") : `SMARD's day-ahead prices begin on ${first.join(", ")} (the first week it lists): there are none for ${label}`);
+  }
   if (results.every((r) => !r.published)) {
     const until = results.find((r) => r.publishedUntil !== undefined)?.publishedUntil;
     return {
       status: "empty",
       searched,
-      reason: `No day-ahead prices for ${label} yet${until === undefined ? "" : ` (published until ${until})`}. The next day's prices are set in the noon auction; SMARD publishes some zones (DE-LU among them) hours later, at times only late in the evening. Ask for today or an earlier day, or ask again later.`,
+      reason: later
+        ? `No day-ahead prices for ${label} yet${until === undefined ? "" : ` (published until ${until})`}. The next day's prices are set in the noon auction; SMARD publishes some zones (DE-LU among them) hours later, at times only late in the evening. Ask for today or an earlier day, or ask again later.`
+        : `${said.join("; ")}.`,
     };
   }
 
   const notes: string[] = [];
-  const unpublished = results.filter((r) => !r.published).map((r) => r.zone);
-  if (unpublished.length > 0) notes.push(`No prices for ${label} yet: ${unpublished.join(", ")}.`);
+  if (later && unpublished.length > 0) notes.push(`No prices for ${label} yet: ${unpublished.map((r) => r.zone).join(", ")}.`);
+  else if (said.length > 0) notes.push(`${said.join("; ")}.`);
   const negative = results.filter((r) => r.negativeSlots > 0);
   if (negative.length > 0) notes.push(`Negative prices (paid to consume) in ${negative.map((r) => `${r.zone} (${r.negativeSlots} slots)`).join(", ")}: real, not an error.`);
   notes.push("1 EUR/MWh is 0.1 ct/kWh. Day-ahead wholesale prices, without grid fees, taxes or levies.");
