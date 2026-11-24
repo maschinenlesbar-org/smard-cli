@@ -297,7 +297,7 @@ test("the current price is the slot running now, not the last published one; the
   assert.equal(fr?.publishedUntil, "2026-11-20T23:45+01:00", "tomorrow's prices are out");
   assert.equal(fr?.tomorrowPublished, true);
   assert.deepEqual(fr?.current, { time: "2026-11-19T15:00+01:00", eurPerMWh: 8.76, ctPerKWh: 0.88 });
-  assert.deepEqual(fr?.min, { time: "2026-11-19T11:15+01:00", eurPerMWh: -0.01, ctPerKWh: 0 });
+  assert.deepEqual(fr?.min, { time: "2026-11-19T11:15+01:00", eurPerMWh: -0.01, ctPerKWh: 0, slotsAtPrice: 7 }, "seven quarter-hours at -0.01: the first is given");
   assert.equal(fr?.max?.time, "2026-11-19T18:45+01:00");
   assert.equal(fr?.slots, 96);
   assert.equal(fr?.negativeSlots, 7);
@@ -398,6 +398,17 @@ test("neighbours, an average of DE-LU's neighbouring zones, is said to be no bid
   assert.equal(prices.status, "ok");
   if (prices.status === "ok") assert.match(prices.notes.join(" "), /neighbours is the average of DE-LU's neighbouring zones \(SMARD's "Anrainer DE\/LU"\), not a bidding zone of its own/);
   await assert.rejects(getPrices(api().client, { zones: ["Mars"] }), /SMARD has prices for DE-LU, .*neighbours \(the average of DE-LU's neighbours\)/);
+});
+
+test("a low or high several slots share says how many: the time given is the first of them", async () => {
+  const recorded = SERIES["254/DE-LU/quarterhour"] as RecordedSeries;
+  const [first, step, values] = recorded.windows["1794783600000"] as [number, number, (number | null)[]];
+  const flat = values.map((v, i) => (first + i * step >= Date.parse("2026-11-19T01:00:00Z") && first + i * step < Date.parse("2026-11-19T02:00:00Z") ? -5 : v));
+  const prices = await getPrices(api({ "254/DE-LU/quarterhour": { index: recorded.index, windows: { "1794783600000": [first, step, flat] } } }).client, { now: NOW, zones: ["FR"] });
+  assert.equal(prices.status, "ok");
+  if (prices.status !== "ok") return;
+  assert.deepEqual(prices.zones[0]?.min, { time: "2026-11-19T02:00+01:00", eurPerMWh: -5, ctPerKWh: -0.5, slotsAtPrice: 4 });
+  assert.equal(prices.zones[0]?.max?.slotsAtPrice, undefined, "one slot at the high");
 });
 
 test("a zone name several zones fit is ambiguous; an unknown zone or a non-price id is refused before any request", async () => {

@@ -813,9 +813,9 @@ export interface ZonePrices {
   published: boolean;
   /** The slot running now (the newest at or before now, never simply the last published one); only for today. */
   current?: PriceAt;
-  /** The day's cheapest and dearest slot (the first of equal ones). */
-  min?: PriceAt;
-  max?: PriceAt;
+  /** The day's cheapest and dearest slot (the first of equal ones; slotsAtPrice says how many share it). */
+  min?: PriceAt & { slotsAtPrice?: number };
+  max?: PriceAt & { slotsAtPrice?: number };
   average?: { eurPerMWh: number; ctPerKWh: number };
   /** The day's slots with a price, and how many of them are negative (paid to consume). */
   slots: number;
@@ -846,6 +846,12 @@ export interface Prices {
 const ct = (eurPerMWh: number): number => Math.round(eurPerMWh * 10) / 100 + 0;
 
 const priceAt = (point: [number, number]): PriceAt => ({ time: berlinTime(point[0]), eurPerMWh: point[1], ctPerKWh: ct(point[1]) });
+
+/** A day's low or high: its first slot, and how many slots share the price when more than one (a flat night). */
+function extreme(point: [number, number], points: readonly [number, number][]): PriceAt & { slotsAtPrice?: number } {
+  const same = points.filter((p) => p[1] === point[1]).length;
+  return { ...priceAt(point), ...(same > 1 ? { slotsAtPrice: same } : {}) };
+}
 
 /**
  * Day-ahead prices for a Berlin day in one or more bidding zones: the current slot (today only:
@@ -921,8 +927,8 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
     result.published = true;
     result.slots = points.length;
     result.negativeSlots = points.filter((p) => p[1] < 0).length;
-    result.min = priceAt(points.reduce((a, b) => (b[1] < a[1] ? b : a)));
-    result.max = priceAt(points.reduce((a, b) => (b[1] > a[1] ? b : a)));
+    result.min = extreme(points.reduce((a, b) => (b[1] < a[1] ? b : a)), points);
+    result.max = extreme(points.reduce((a, b) => (b[1] > a[1] ? b : a)), points);
     const average = points.reduce((sum, p) => sum + p[1], 0) / points.length;
     result.average = { eurPerMWh: round2(average), ctPerKWh: ct(average) };
   }
