@@ -9,6 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listTools } from "../src/mcp/server.js";
+import { SIZE_HINT, TOOLS } from "../src/mcp/tools.js";
 import { connect, recorder } from "./harness.js";
 import { makeMockTransport, rawResponse, SERIES, smardApi } from "./helpers.js";
 
@@ -175,4 +176,27 @@ test("an offset past the end of the list says so in a note, with how many there 
   assert.deepEqual(windows["windows"], []);
   assert.match((windows["notes"] as string[]).join(" "), /offset 12 is past the end: there are 12 windows \(offsets 0-11\)/);
   await connection.close();
+});
+
+test("the deadline's and the size cap's advice fit every tool: each option named with the tools that take it", async () => {
+  const hanging = { transport: (): Promise<never> => new Promise<never>(() => {}) };
+  const connection = await connect({ transport: hanging, config: { callTimeoutMs: 30 } });
+  const deadline = (await connection.call("getGenerationMix", {})).content[0]?.text ?? "";
+  await connection.close();
+  assert.match(deadline, /took longer than .* and was stopped/);
+  const schemas = new Map(TOOLS.map((tool) => [tool.name, Object.keys((tool.inputSchema as { properties: Record<string, unknown> }).properties)]));
+  for (const text of [deadline, SIZE_HINT]) {
+    assert.match(text, /getGenerationMix/, "the mix, which takes none of the options, is named");
+    const pairs = [...text.matchAll(/(\w+(?: or \w+)*) \((\w+(?:, \w+)*)\)/g)];
+    assert.ok(pairs.length >= 2, text);
+    for (const [, options, tools] of pairs) {
+      for (const tool of (tools as string).split(", ")) {
+        for (const option of (options as string).split(" or ")) assert.ok(schemas.get(tool)?.includes(option), `${tool} takes no ${option}: ${text}`);
+      }
+    }
+    const named = new Set(pairs.flatMap(([, options]) => (options as string).split(" or ")));
+    for (const option of ["resolution", "limit", "offset", "zones", "nulls", "query", "group", "region"]) {
+      assert.ok(!new RegExp(`\\b${option}\\b`).test(text) || named.has(option), `${option} named without its tools: ${text}`);
+    }
+  }
 });
