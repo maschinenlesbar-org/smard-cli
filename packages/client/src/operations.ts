@@ -267,16 +267,19 @@ type Lookup = { found: SeriesInfo } | { candidates: SeriesInfo[] } | { unknown: 
  * name. A word that names one series exactly wins; several partial matches are ambiguous.
  * `among` narrows the search (the price zones).
  */
-function lookupSeries(value: string | number, among: readonly SeriesInfo[] = SERIES_INFO): Lookup {
+function lookupSeries(value: string | number, among: readonly SeriesInfo[] = SERIES_INFO, what: "series" | "zone" = "series"): Lookup {
+  const expected = what === "zone" ? "Expected a zone code, a name or a price series id." : "Expected a series id (a non-negative integer) or a name.";
   if (typeof value === "number" || /^\s*\d+\s*$/.test(value)) {
     const id = Number(value);
-    if (!Number.isSafeInteger(id) || id < 0) throw new SmardValidationError(`Invalid series ${quoteValue(String(value))}. Expected a series id (a non-negative integer) or a name.`);
+    if (!Number.isSafeInteger(id) || id < 0) throw new SmardValidationError(`Invalid ${what} ${quoteValue(String(value))}. ${expected}`);
     const found = among.find((s) => s.id === id);
     return found === undefined ? { unknown: id } : { found };
   }
-  const text = normalizeText(assertValid("series", value, textProblem));
+  const text = normalizeText(assertValid(what, value, textProblem));
+  // Text without a letter that isn't a whole id (-1, 1., #2, 4169.0, +410) names nothing: folded
+  // to its digits it matched "Dänemark 1" as a part of a name.
+  if (!/\p{L}/u.test(text)) throw new SmardValidationError(`Invalid ${what} ${quoteValue(text)}. ${expected}`);
   const key = fold(text);
-  if (key === "") throw new SmardValidationError(`Invalid series ${quoteValue(text)}. Expected a series id or a name.`);
   const exact = among.filter((s) => fold(s.name) === key || fold(s.nameEn) === key || s.zone?.toLowerCase() === text.toLowerCase() || (SERIES_EXTRA[s.id]?.words ?? []).some((w) => fold(w) === key));
   if (exact.length === 1) return { found: exact[0] as SeriesInfo };
   if (exact.length > 1) return { candidates: exact };
@@ -876,7 +879,7 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
   const searched = { zones: asked, resolution, day: dayText };
   const zones: SeriesInfo[] = [];
   for (const value of asked) {
-    const found = lookupSeries(value, PRICE_ZONES);
+    const found = lookupSeries(value, PRICE_ZONES, "zone");
     if ("candidates" in found) {
       return { status: "ambiguous", searched, candidates: candidatesOf(found.candidates), reason: `${quoteValue(String(value))} fits ${found.candidates.length} bidding zones: ask which one, then call again with its zone code.` };
     }
@@ -1178,8 +1181,15 @@ export function listSeries(input: { group?: string; query?: string } = {}): Seri
     searched["group"] = group;
   }
   if (input.query !== undefined) {
-    const key = fold(normalizeText(assertValid("query", input.query, textProblem)));
-    series = series.filter((s) => fold(s.name).includes(key) || fold(s.nameEn).includes(key) || (SERIES_EXTRA[s.id]?.words ?? []).some((w) => fold(w) === key) || fold(s.zone ?? "") === key);
+    const text = normalizeText(assertValid("query", input.query, textProblem));
+    // A number is an id; other text without a letter (-1, #2) names nothing.
+    if (/^\d+$/.test(text)) {
+      series = series.filter((s) => String(s.id) === text);
+    } else {
+      if (!/\p{L}/u.test(text)) throw new SmardValidationError(`Invalid query ${quoteValue(text)}. Expected a part of a series' name or a series id.`);
+      const key = fold(text);
+      series = series.filter((s) => fold(s.name).includes(key) || fold(s.nameEn).includes(key) || (SERIES_EXTRA[s.id]?.words ?? []).some((w) => fold(w) === key) || fold(s.zone ?? "") === key);
+    }
     searched["query"] = input.query;
   }
   return {

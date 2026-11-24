@@ -497,6 +497,21 @@ test("a name several series fit is ambiguous with the candidates; a name none fi
   assert.equal(none.status, "empty");
 });
 
+test("id-shaped text that isn't an id is refused, never matched as part of a name (Dänemark 1)", async () => {
+  const { client, mock } = api();
+  for (const text of ["-1", "1.", "#1", "#2", "4169.0", "+410"]) {
+    await assert.rejects(getSeries(client, { series: text }), new RegExp(`Invalid series "${text.replace(/[.+]/g, "\\$&")}"\\. Expected a series id \\(a non-negative integer\\) or a name`));
+    await assert.rejects(listWindows(client, { series: text }), /Invalid series/);
+    await assert.rejects(getPrices(client, { zones: [text] }), new RegExp(`Invalid zone "${text.replace(/[.+]/g, "\\$&")}"\\. Expected a zone code, a name or a price series id`));
+  }
+  assert.throws(() => listSeries({ query: "-1" }), /Invalid query "-1"/);
+  assert.deepEqual(listSeries({ query: "1" }).series.map((s) => s.id), [], "a number in query is an id");
+  assert.deepEqual(listSeries({ query: "4169" }).series.map((s) => s.id), [4169]);
+  assert.equal(mock.calls.length, 0);
+  const dk = await getPrices(api().client, { now: NOW, zones: ["DK-1"] });
+  assert.equal(dk.status === "ok" || dk.status === "empty", true, "DK-1 is a name of Denmark 1");
+});
+
 // --- listSeries, listWindows ---
 
 test("listSeries: a group, a word, the regions and what one window of each resolution holds", () => {

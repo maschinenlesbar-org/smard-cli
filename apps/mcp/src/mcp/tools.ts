@@ -191,7 +191,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     ].join("\n\n"),
     inputSchema: input({
       group: { type: "string", enum: ["generation", "consumption", "price", "forecast"], description: "Only this group." },
-      query: { type: "string", minLength: 1, maxLength: 60, description: 'A part of a series\' name, German or English ("wind", "Residuallast", "France").' },
+      query: { type: "string", minLength: 1, maxLength: 60, description: 'A part of a series\' name, German or English ("wind", "Residuallast", "France"), or a series id ("4169").' },
     }),
     outputSchema: output({ series: arr, regions: arr, resolutions: arr }),
     source: "https://smard.api.bund.dev/",
