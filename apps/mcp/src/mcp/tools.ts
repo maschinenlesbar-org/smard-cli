@@ -153,7 +153,7 @@ export const TOOLS: readonly ToolDefinition[] = [
     title: "One SMARD series over a date range",
     description: [
       'One SMARD series (generation by source, grid load, residual load, a forecast, a price) over a date range as one ordered list of rows, for a table, chart or CSV. Use it for "Netzlast der letzten zwei Wochen als CSV", "stündliche PV-Erzeugung im Oktober", "Strompreis-Zeitreihe exportieren", "export the grid load for the last 4 weeks as CSV", "give me hourly solar generation as a spreadsheet", "pull the price series into a dataframe", "monthly wind generation in 2025".',
-      'Rows are {time, value}: sub-day rows by the UTC instant (header timestamp_utc; add Berlin time as a second column if asked: the last Sunday of October repeats 02:00), day and longer by the Berlin period (date, month, year), never a UTC date. The unpublished tail (after SMARD\'s newest value) is left out (nulls.unpublished); other nulls, at the end of a past range too, are gaps: dropped or, with nulls keep, null: an empty cell, never 0. Without from/to: the newest window (a week at hour). A range over more windows than allowed answers the first ones and incomplete.nextFrom: call again from there. Units: MWh per period, EUR/MWh for prices (region DE-LU by default). A name several series fit (wind) is ambiguous. Paged: nextOffset; header gives a CSV header. When writing a file, say how many rows, the range (first, last) and the gaps.',
+      'Rows are {time, value}: sub-day rows by the UTC instant (header timestamp_utc; add Berlin time as a second column if asked: the last Sunday of October repeats 02:00), day and longer by the Berlin period (date, month, year), never a UTC date. The unpublished tail (after SMARD\'s newest value) is left out (nulls.unpublished); other nulls, at the end of a past range too, are gaps: dropped or, with nulls keep, null: an empty cell, never 0. Without from/to: the newest window (a week at hour); to alone: the one window holding to; from alone: windows from there on. A range over more windows than allowed answers the first ones and incomplete.nextFrom: call again from there. Units: MWh per period, EUR/MWh for prices (region DE-LU by default). A name several series fit (wind) is ambiguous. Paged: nextOffset; header gives a CSV header. When writing a file, say how many rows, the range (first, last) and the gaps.',
       RULES,
     ].join("\n\n"),
     inputSchema: input(
@@ -162,7 +162,7 @@ export const TOOLS: readonly ToolDefinition[] = [
         region: region("DE, DE-LU for a price"),
         resolution: resolution("hour"),
         from: time("Range start"),
-        to: time("Range end (the whole period it names is included)"),
+        to: time("Range end (the whole period it names is included); alone, only the window (a week at hour) holding it"),
         nulls: { type: "string", enum: ["drop", "keep"], description: "Gaps inside the range: drop (default) or keep as null." },
         offset: offset(100_000),
         limit: limit(1000, 200, "rows"),
