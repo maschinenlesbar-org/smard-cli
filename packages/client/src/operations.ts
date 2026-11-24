@@ -780,6 +780,12 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
 /** The price series, the bidding zones. */
 export const PRICE_ZONES: readonly SeriesInfo[] = SERIES_INFO.filter((s) => s.kind === "price");
 
+/** The one price series that is no bidding zone: an average of DE-LU's neighbours (5078). */
+const NEIGHBOURS = "neighbours";
+
+/** A zone as a message lists it: its code, and what `neighbours` is. */
+const zoneName = (z: SeriesInfo): string => (z.zone === NEIGHBOURS ? `${NEIGHBOURS} (the average of DE-LU's neighbours)` : (z.zone ?? String(z.id)));
+
 export interface PricesInput {
   /** 1-8 bidding zones: a code (DE-LU, FR, AT, NL, DK1 …), a name (Frankreich, Austria), or a price series id; default DE-LU. */
   zones?: (string | number)[];
@@ -868,8 +874,8 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
     if ("candidates" in found) {
       return { status: "ambiguous", searched, candidates: candidatesOf(found.candidates), reason: `${quoteValue(String(value))} fits ${found.candidates.length} bidding zones: ask which one, then call again with its zone code.` };
     }
-    if ("unknown" in found) throw new SmardValidationError(`Invalid zone ${quoteValue(String(value))}: ${found.unknown} is not one of SMARD's price series (${PRICE_ZONES.map((z) => `${z.id} ${z.zone}`).join(", ")}).`);
-    if ("none" in found) throw new SmardValidationError(`Invalid zone ${quoteValue(String(value))}: no bidding zone of that name. SMARD has prices for ${PRICE_ZONES.map((z) => z.zone).join(", ")}.`);
+    if ("unknown" in found) throw new SmardValidationError(`Invalid zone ${quoteValue(String(value))}: ${found.unknown} is not one of SMARD's price series (${PRICE_ZONES.map((z) => `${z.id} ${zoneName(z)}`).join(", ")}).`);
+    if ("none" in found) throw new SmardValidationError(`Invalid zone ${quoteValue(String(value))}: no bidding zone of that name. SMARD has prices for ${PRICE_ZONES.map(zoneName).join(", ")}.`);
     if (!zones.includes(found.found)) zones.push(found.found);
   }
 
@@ -952,6 +958,7 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
   else if (said.length > 0) notes.push(`${said.join("; ")}.`);
   const negative = results.filter((r) => r.negativeSlots > 0);
   if (negative.length > 0) notes.push(`Negative prices (paid to consume) in ${negative.map((r) => `${r.zone} (${r.negativeSlots} slots)`).join(", ")}: real, not an error.`);
+  if (results.some((r) => r.zone === NEIGHBOURS)) notes.push(`${NEIGHBOURS} is the average of DE-LU's neighbouring zones (SMARD's "Anrainer DE/LU"), not a bidding zone of its own.`);
   notes.push("1 EUR/MWh is 0.1 ct/kWh. Day-ahead wholesale prices, without grid fees, taxes or levies.");
 
   let comparison: Prices["comparison"];

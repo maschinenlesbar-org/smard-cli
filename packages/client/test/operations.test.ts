@@ -392,6 +392,14 @@ test("a day before a zone's prices begin says when they begin, never 'not publis
   if (mixed.status === "empty") assert.match(mixed.reason, /SMARD has no day-ahead prices for 2026-11-02 in DE-LU \(its file of that week has none\); FR's begin on 2026-11-16/);
 });
 
+test("neighbours, an average of DE-LU's neighbouring zones, is said to be no bidding zone of its own", async () => {
+  const series = SERIES["254/DE-LU/quarterhour"] as RecordedSeries;
+  const prices = await getPrices(api({ "5078/DE-LU/quarterhour": series }).client, { now: NOW, zones: ["DE-LU", "Anrainer"] });
+  assert.equal(prices.status, "ok");
+  if (prices.status === "ok") assert.match(prices.notes.join(" "), /neighbours is the average of DE-LU's neighbouring zones \(SMARD's "Anrainer DE\/LU"\), not a bidding zone of its own/);
+  await assert.rejects(getPrices(api().client, { zones: ["Mars"] }), /SMARD has prices for DE-LU, .*neighbours \(the average of DE-LU's neighbours\)/);
+});
+
 test("a zone name several zones fit is ambiguous; an unknown zone or a non-price id is refused before any request", async () => {
   const denmark = await getPrices(api().client, { now: NOW, zones: ["Dänemark"] });
   assert.equal(denmark.status, "ambiguous");
