@@ -523,6 +523,16 @@ test("coal is lignite or hard coal, as Kohle is: ambiguous in both languages, an
   assert.equal(hard.status, "ok");
 });
 
+test("a forecast named by its words in another order or language (Prognose Solar) is found; several fits stay ambiguous", async () => {
+  const { client } = api({ "125/DE/hour": SERIES["410/DE/hour"] });
+  const solar = await getSeries(client, { series: "Prognose Solar" });
+  assert.equal(solar.status === "ok" ? solar.series.id : solar.status, 125);
+  const wind = await getSeries(client, { series: "Prognose Wind" });
+  assert.equal(wind.status, "ambiguous");
+  if (wind.status === "ambiguous") assert.deepEqual(wind.candidates.map((c) => c.id), [3791, 123, 5097]);
+  assert.deepEqual(listSeries({ query: "Prognose Solar" }).series.map((s) => s.id), [125, 5097]);
+});
+
 // --- listSeries, listWindows ---
 
 test("listSeries: a group, a word, the regions and what one window of each resolution holds", () => {

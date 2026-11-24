@@ -260,8 +260,20 @@ export function fold(text: string): string {
 
 /** Whether `key` (folded) is a part of a series' German or English name or of one of its words ("coal" of "brown coal"). */
 function partOf(s: SeriesInfo, key: string): boolean {
-  return [s.name, s.nameEn, ...(SERIES_EXTRA[s.id]?.words ?? [])].some((name) => fold(name).includes(key));
+  return namesOf(s).some((name) => name.includes(key));
 }
+
+/** A series' German and English names and its words, folded. */
+const namesOf = (s: SeriesInfo): string[] => [s.name, s.nameEn, ...(SERIES_EXTRA[s.id]?.words ?? [])].map(fold);
+
+/** Whether every word of `key` (folded) starts a word of the series' names or words, in any order or language. */
+function wordsOf(s: SeriesInfo, key: string): boolean {
+  const own = namesOf(s).flatMap((name) => name.split(" "));
+  return key.split(" ").every((word) => own.some((w) => w.startsWith(word)));
+}
+
+/** The fewest words of one of a series' names or words. */
+const shortestName = (s: SeriesInfo): number => Math.min(...namesOf(s).map((name) => name.split(" ").length));
 
 /** A series a text names: one, several (ambiguous), or none. */
 type Lookup = { found: SeriesInfo } | { candidates: SeriesInfo[] } | { unknown: number } | { none: string };
@@ -291,6 +303,13 @@ function lookupSeries(value: string | number, among: readonly SeriesInfo[] = SER
   const partial = among.filter((s) => partOf(s, key));
   if (partial.length === 1) return { found: partial[0] as SeriesInfo };
   if (partial.length > 1) return { candidates: partial };
+  // Words from several names ("Prognose Solar": Prognose: Photovoltaik / Forecast: solar): the
+  // series with the shortest name among those that have them all.
+  const tokens = among.filter((s) => wordsOf(s, key));
+  const shortest = Math.min(...tokens.map(shortestName));
+  const best = tokens.filter((s) => shortestName(s) === shortest);
+  if (best.length === 1) return { found: best[0] as SeriesInfo };
+  if (best.length > 1) return { candidates: best };
   return { none: text };
 }
 
@@ -1193,7 +1212,7 @@ export function listSeries(input: { group?: string; query?: string } = {}): Seri
     } else {
       if (!/\p{L}/u.test(text)) throw new SmardValidationError(`Invalid query ${quoteValue(text)}. Expected a part of a series' name or a series id.`);
       const key = fold(text);
-      series = series.filter((s) => partOf(s, key) || fold(s.zone ?? "") === key);
+      series = series.filter((s) => partOf(s, key) || wordsOf(s, key) || fold(s.zone ?? "") === key);
     }
     searched["query"] = input.query;
   }
