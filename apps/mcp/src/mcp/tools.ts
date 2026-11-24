@@ -96,9 +96,15 @@ function page<T>(items: readonly T[], args: Record<string, unknown>, fallback: n
   return { items: items_, total: items.length, ...(next < items.length ? { nextOffset: next } : {}) };
 }
 
+/** Where the documented series are listed: the source of an answer made without a request (a name that fits none or several). */
+const CATALOGUE = "https://smard.api.bund.dev/";
+
+/** The source of an answer that isn't ok: the index it read, or the catalogue when it read none. */
+const emptySource = (answer: object): string => ("read" in answer && typeof answer.read === "string" ? answer.read : CATALOGUE);
+
 /** A result without the fields that only made its source. */
 function withoutSourceFields<T extends object>(answer: T): Record<string, unknown> {
-  const { window: _window, filter: _filter, filters: _filters, ...rest } = answer as Record<string, unknown>;
+  const { window: _window, filter: _filter, filters: _filters, read: _read, ...rest } = answer as Record<string, unknown>;
   return rest;
 }
 
@@ -163,7 +169,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       ["series"],
     ),
     outputSchema: output({ series: obj, region: str_, resolution: str_, timeKey: str_, header: str_, rows: arr, first: str_, last: str_, nulls: obj, windowsRead: int, files: arr, incomplete: obj, nextOffset: int }),
-    source: sourceFor((args) => `chart_data/${encodeURIComponent(str(args, "series") ?? "")}/${encodeURIComponent(str(args, "region") ?? "DE")}/index_${str(args, "resolution") ?? "hour"}.json`),
+    source: sourceFor(() => CATALOGUE),
     paged: (args) => ({ list: "rows", offset: num(args, "offset") ?? 0 }),
     async run(args, context) {
       const rows = await getSeries(context.client, {
@@ -175,7 +181,10 @@ export const TOOLS: readonly ToolDefinition[] = [
         nulls: str(args, "nulls") === "keep" ? "keep" : "drop",
         maxWindows: context.maxPages,
       });
-      if (rows.status !== "ok") return withoutSourceFields(rows);
+      if (rows.status !== "ok") {
+        requested.set(args, emptySource(rows));
+        return withoutSourceFields(rows);
+      }
       requested.set(args, filesPath([rows.series.id], rows.region, rows.resolution, rows.files.map((f) => f.timestamp)));
       const { items, total, nextOffset } = page(rows.rows, args, 200);
       return { ...withoutSourceFields(rows), rows: items, total, ...(nextOffset === undefined ? {} : { nextOffset }) };
@@ -194,7 +203,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       query: { type: "string", minLength: 1, maxLength: 60, description: 'A part of a series\' name, German or English ("wind", "Residuallast", "France"), or a series id ("4169").' },
     }),
     outputSchema: output({ series: arr, regions: arr, resolutions: arr }),
-    source: "https://smard.api.bund.dev/",
+    source: CATALOGUE,
     async run(args) {
       return { ...listSeries({ group: str(args, "group"), query: str(args, "query") }) };
     },
@@ -209,11 +218,14 @@ export const TOOLS: readonly ToolDefinition[] = [
     ].join("\n\n"),
     inputSchema: input({ series, region: region("DE, DE-LU for a price"), resolution: resolution("hour"), offset: offset(5000), limit: limit(700, 50, "windows") }, ["series"]),
     outputSchema: output({ series: obj, region: str_, resolution: str_, span: str_, windows: arr, oldest: str_, newest: str_, nextOffset: int }),
-    source: sourceFor((args) => `chart_data/${encodeURIComponent(str(args, "series") ?? "")}/${encodeURIComponent(str(args, "region") ?? "DE")}/index_${str(args, "resolution") ?? "hour"}.json`),
+    source: sourceFor(() => CATALOGUE),
     paged: (args) => ({ list: "windows", offset: num(args, "offset") ?? 0 }),
     async run(args, context) {
       const windows = await listWindows(context.client, { series: str(args, "series") ?? "", region: str(args, "region"), resolution: str(args, "resolution") });
-      if (windows.status !== "ok") return { ...windows };
+      if (windows.status !== "ok") {
+        requested.set(args, emptySource(windows));
+        return withoutSourceFields(windows);
+      }
       requested.set(args, `chart_data/${windows.series.id}/${encodeURIComponent(windows.region)}/index_${windows.resolution}.json`);
       const { items, total, nextOffset } = page(windows.windows, args, 50);
       return { ...windows, windows: items, total, ...(nextOffset === undefined ? {} : { nextOffset }) };

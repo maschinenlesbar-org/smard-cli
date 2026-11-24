@@ -533,6 +533,7 @@ function noSuchSeries(filter: number, region: Region, resolution: Resolution, se
   return {
     status: "empty",
     searched,
+    read: indexPathOf(filter, region, resolution),
     reason: `SMARD publishes no series ${filter} for region ${region} at resolution ${resolution} (HTTP 404).${price && region !== "DE-LU" ? " Price series use region DE-LU." : " Check the id with listSeries; not every series exists in every region and resolution."}`,
   };
 }
@@ -542,7 +543,12 @@ export interface Empty {
   status: "empty";
   reason: string;
   searched: Record<string, unknown>;
+  /** The index read for the series asked (under the API base), for `source`; none when no request was made. */
+  read?: string;
 }
+
+/** The path of a series' index under the API base. */
+const indexPathOf = (filter: number, region: Region, resolution: Resolution): string => `chart_data/${filter}/${encodeURIComponent(region)}/index_${resolution}.json`;
 
 /** A name several series or zones fit: the candidates, to ask which one. */
 export interface Ambiguous {
@@ -1116,7 +1122,7 @@ export async function getSeries(client: SmardClient, input: SeriesInput): Promis
     return noSuchSeries(id, region, resolution, searched);
   }
   const newest = starts[starts.length - 1];
-  if (newest === undefined) return { status: "empty", searched, reason: `SMARD lists no windows for series ${id} in ${region} at ${resolution}.` };
+  if (newest === undefined) return { status: "empty", searched, read: indexPathOf(id, region, resolution), reason: `SMARD lists no windows for series ${id} in ${region} at ${resolution}.` };
   // The windows the range touches: from the one holding `from` to the one holding `to`.
   // Neither: the newest window with published values (a week just begun has none yet).
   const settled = from === undefined && to === undefined ? await reader.lastSettled() : undefined;
@@ -1125,7 +1131,7 @@ export async function getSeries(client: SmardClient, input: SeriesInput): Promis
   let wanted = starts.filter((s) => s < toLimit && (fromWindow === undefined ? true : s >= fromWindow));
   if (from === undefined && to !== undefined) wanted = wanted.slice(-1);
   if (wanted.length === 0) {
-    return { status: "empty", searched, reason: `SMARD's ${resolution} series ${id} starts at ${periodLabel(starts[0] as number, resolution)}: the range ends before it.` };
+    return { status: "empty", searched, read: indexPathOf(id, region, resolution), reason: `SMARD's ${resolution} series ${id} starts at ${periodLabel(starts[0] as number, resolution)}: the range ends before it.` };
   }
   let incomplete: SeriesExport["incomplete"];
   let upper = toLimit;
@@ -1160,7 +1166,7 @@ export async function getSeries(client: SmardClient, input: SeriesInput): Promis
   if (subDay) notes.push("time is the UTC instant each period starts; for Berlin wall-clock time add a second column (the last Sunday in October repeats 02:00-02:59).");
   else notes.push(`time is the Berlin ${resolution === "week" ? "date of the week's Monday" : resolution} each value is for (SMARD's periods start at Berlin midnight; their UTC date is the day before).`);
   if (rows.length === 0) {
-    return { status: "empty", searched: { ...searched, region, resolution }, reason: `No published values of series ${id} in ${region} at ${resolution} in the range${unpublished > 0 ? " yet (only the unpublished tail)" : ""}.` };
+    return { status: "empty", searched: { ...searched, region, resolution }, read: indexPathOf(id, region, resolution), reason: `No published values of series ${id} in ${region} at ${resolution} in the range${unpublished > 0 ? " yet (only the unpublished tail)" : ""}.` };
   }
   return {
     status: "ok",
@@ -1262,7 +1268,7 @@ export async function listWindows(client: SmardClient, input: { series: string |
     await reader.absent(err);
     return noSuchSeries(id, region, resolution, searched);
   }
-  if (starts.length === 0) return { status: "empty", searched, reason: `SMARD lists no windows for series ${id} in ${region} at ${resolution}.` };
+  if (starts.length === 0) return { status: "empty", searched, read: indexPathOf(id, region, resolution), reason: `SMARD lists no windows for series ${id} in ${region} at ${resolution}.` };
   const windows = [...starts].reverse().map((timestamp) => ({ start: berlinTime(timestamp), label: periodLabel(timestamp, resolution), timestamp }));
   return {
     status: "ok",

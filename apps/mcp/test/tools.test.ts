@@ -150,3 +150,18 @@ test("getGenerationMix cites the files it read: nuclear's when nuclear counts, n
   assert.equal(mix["source"], `${BASE}/chart_data/{4069,4071,1227,4067,4068,4066,1226,1228,4070}/TransnetBW/{id}_TransnetBW_day_1767222000000.json`);
   await bw.close();
 });
+
+test("an empty getSeries or listWindows answer cites the index of the series the name resolved to, or the catalogue when none was read", async () => {
+  const connection = await connect({ transport: smardApi() });
+  for (const tool of ["getSeries", "listWindows"]) {
+    const pv = (await connection.call(tool, { series: "pv" })).structuredContent ?? {};
+    assert.equal(pv["status"], "empty", tool);
+    assert.equal(pv["source"], `${BASE}/chart_data/4068/DE/index_hour.json`, tool);
+    const none = (await connection.call(tool, { series: "Kaffee" })).structuredContent ?? {};
+    assert.equal(none["status"], "empty", tool);
+    assert.equal(none["source"], "https://smard.api.bund.dev/", tool);
+    const wind = (await connection.call(tool, { series: "wind" })).structuredContent ?? {};
+    assert.equal(wind["source"], "https://smard.api.bund.dev/", tool);
+  }
+  await connection.close();
+});
