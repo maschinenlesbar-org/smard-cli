@@ -22,7 +22,7 @@
 import type { SmardClient } from "./client.js";
 import { FILTERS, RegionValues, ResolutionValues, type FilterGroup, type Region, type Resolution } from "./enums.js";
 import { SmardApiError, SmardValidationError, quoteValue } from "./errors.js";
-import type { SeriesMetaData, SeriesPoint } from "./types.js";
+import type { SeriesMetaData, SeriesPoint, SeriesResult } from "./types.js";
 import { assertValid, normalizeText, textProblem } from "./validate.js";
 
 // --- Shared: Berlin time --------------------------------------------------------------------
@@ -344,7 +344,7 @@ class Upstream {
    * and the not-there error when the grid load's index is a 404 too.
    */
   async absent(err: unknown, filter: number, region: Region, resolution: Resolution): Promise<void> {
-    if (!(err instanceof SmardApiError) || err.status !== 404 || notThereErrors.has(err)) throw err;
+    if (!is404(err)) throw err;
     if (this.answered) return;
     const control = (): never => {
       const notThere = new SmardApiError({
@@ -372,9 +372,17 @@ class Upstream {
 /** The index SMARD always has: the grid load in Germany at hour. */
 const CONTROL = { filter: 410, region: "DE" as Region, resolution: "hour" as Resolution };
 
-/** One series' index and the windows read so far, so a use case reads each file once. */
+/** A 404 that may be a file SMARD lacks (not one already found to mean SMARD isn't there). */
+const is404 = (err: unknown): err is SmardApiError => err instanceof SmardApiError && err.status === 404 && !notThereErrors.has(err);
+
+/**
+ * One series' index and the windows read so far, so a use case reads each file once. With
+ * `shared`, the series takes another's index (the series of one region and resolution share their
+ * windows), so the mix reads one index instead of eleven; a window of it this series hasn't got
+ * (a 404) makes it read its own.
+ */
 class SeriesReader {
-  private index: number[] | undefined;
+  private index: Promise<number[]> | undefined;
   private readonly windows = new Map<number, SeriesPoint[]>();
   private readonly metas = new Map<number, SeriesMetaData>();
 
@@ -384,15 +392,19 @@ class SeriesReader {
     readonly region: Region,
     readonly resolution: Resolution,
     readonly upstream: Upstream = new Upstream(client),
+    private readonly shared?: SeriesReader,
   ) {}
 
-  /** The window starts, oldest first. */
-  async starts(): Promise<number[]> {
-    if (this.index === undefined) {
-      const index = await this.client.timestamps(this.filter, this.region, this.resolution);
+  /** The window starts, oldest first: the series' own index, or the shared one until a window of it is missing. */
+  starts(): Promise<number[]> {
+    return this.index === undefined && this.shared !== undefined ? this.shared.starts() : this.ownStarts();
+  }
+
+  private ownStarts(): Promise<number[]> {
+    this.index ??= this.client.timestamps(this.filter, this.region, this.resolution).then((index) => {
       this.upstream.ok();
-      this.index = [...index].sort((a, b) => a - b);
-    }
+      return [...index].sort((a, b) => a - b);
+    });
     return this.index;
   }
 
@@ -405,7 +417,16 @@ class SeriesReader {
   async points(start: number): Promise<SeriesPoint[]> {
     let points = this.windows.get(start);
     if (points === undefined) {
-      const file = await this.client.series(this.filter, this.region, this.resolution, start);
+      let file: SeriesResult;
+      try {
+        file = await this.client.series(this.filter, this.region, this.resolution, start);
+      } catch (err) {
+        // The shared index named a window this series hasn't got: its own index says whether it has.
+        if (this.shared === undefined || this.index !== undefined || !is404(err)) throw err;
+        if ((await this.ownStarts()).includes(start)) throw err;
+        this.windows.set(start, []);
+        return [];
+      }
       this.upstream.ok();
       points = [...file.series].sort((a, b) => a[0] - b[0]);
       this.windows.set(start, points);
@@ -489,6 +510,29 @@ const candidatesOf = (list: readonly SeriesInfo[]) => list.map((s) => ({ id: s.i
 const MIX_SOURCES = [1223, 4069, 4071, 1227, 1224, 4067, 1225, 4068, 4066, 1226, 1228];
 const PUMPED_STORAGE = 4070;
 const NUCLEAR = 1224;
+/** How many files the mix reads at a time. */
+const MIX_PARALLEL = 2;
+
+/** `fn` over `items`, at most `limit` at a time, the results in order; after a failure nothing more is started. */
+async function inTurns<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  let next = 0;
+  let failed = false;
+  const worker = async (): Promise<void> => {
+    while (!failed && next < items.length) {
+      const i = next++;
+      try {
+        results[i] = await fn(items[i] as T);
+      } catch (err) {
+        failed = true;
+        throw err;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 /** Germany's last three reactors went offline on 15 April 2023: no nuclear generation since. */
 const NUCLEAR_END = fromBerlin(2023, 4, 16);
 
@@ -547,8 +591,9 @@ export interface GenerationMix {
  * renewable and the fossil share. Without `at`, the newest period every source has settled data
  * for (the last non-null point, never the null tail; a source ahead of the others is read at the
  * period all have, the sources behind named). Kernenergie is left out of any period after 15 April 2023 (its series is dead,
- * its last point an old 0), Pumpspeicher (storage) is given apart and not counted. One index and
- * one window file per source (about 22 requests), read one after the other.
+ * its last point an old 0), Pumpspeicher (storage) is given apart and not counted. One index
+ * (the sources share their windows) and a window file per source (about 12 requests), two at a
+ * time; a source's own index only when the shared one names a window it hasn't got.
  */
 export async function getGenerationMix(client: SmardClient, input: GenerationMixInput = {}): Promise<GenerationMix | Empty> {
   const region = resolveRegion(input.region, "DE");
@@ -563,7 +608,9 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     return false;
   });
   const upstream = new Upstream(client);
-  const readers = new Map([...ids, PUMPED_STORAGE].map((id) => [id, new SeriesReader(client, id, region, resolution, upstream)]));
+  // One index (Wind Onshore's) for every source: they share their windows.
+  const reference = new SeriesReader(client, 4067, region, resolution, upstream);
+  const readers = new Map([...ids, PUMPED_STORAGE].map((id) => [id, id === reference.filter ? reference : new SeriesReader(client, id, region, resolution, upstream, reference)]));
   const reader = (id: number) => readers.get(id) as SeriesReader;
 
   try {
@@ -576,10 +623,11 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
       target = point[0];
     } else {
       const newest = new Map<number, number>();
-      for (const id of ids) {
-        const settled = await reader(id).lastSettled();
+      const settledOf = await inTurns(ids, MIX_PARALLEL, (id) => reader(id).lastSettled());
+      ids.forEach((id, i) => {
+        const settled = settledOf[i];
         if (settled !== undefined) newest.set(id, settled[0]);
-      }
+      });
       if (newest.size === 0) return { status: "empty", searched, reason: `No source has settled ${resolution} data in region ${region} yet.` };
       target = Math.min(...newest.values());
       const latest = Math.max(...newest.values());
@@ -594,8 +642,9 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
       const point = await reader(id).pointAt(target);
       return point !== undefined && point[0] === target ? point[1] : null;
     };
-    for (const id of ids) {
-      const value = await valueAt(id);
+    const values = await inTurns(ids, MIX_PARALLEL, valueAt);
+    for (const [i, id] of ids.entries()) {
+      const value = values[i] as number | null;
       const s = info(id);
       if (value === null) missing.push({ id, name: s.name });
       else sources.push({ id, name: s.name, nameEn: s.nameEn, kind: s.kind as MixSource["kind"], mwh: value, share: 0 });

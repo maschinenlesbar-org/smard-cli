@@ -82,8 +82,8 @@ zones fit ("wind", "Dänemark") is reported with the candidates, never guessed; 
 no file for is an empty answer saying what was asked, but a 404 from a base URL that reaches no
 SMARD (one ending in `/app`: the client adds `/app` itself) or from an error page is a tool error:
 the grid load's index (410, DE, hour), which SMARD always has, is asked once to tell them apart. SMARD publishes one file per series and
-week (or year), so getGenerationMix reads 22 files (an index and a window per source), one after the
-other.
+week (or year), so getGenerationMix reads about 12 files (one index the sources share, then a window
+per source), two at a time.
 
 Every tool only reads. An answer is JSON (`structuredContent` and the same as text), with the
 `source` it came from (whole, never cut like the data) and the data licence. A text over 2000

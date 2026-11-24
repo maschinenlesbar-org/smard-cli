@@ -93,7 +93,27 @@ test("the mix of the newest settled day: the last non-null point, never the null
   assert.equal(mix.renewableShare, 77.1);
   assert.equal(mix.fossilShare, 22.9);
   assert.equal(mix.window, DAY_2026);
-  assert.equal(mock.calls.length, 22, "an index and a window per source, nuclear not read");
+  assert.equal(mock.calls.length, 12, "one index, then a window per source and pumped storage; nuclear not read");
+  assert.equal(mock.calls.filter((c) => c.url.includes("/index_")).length, 1);
+});
+
+test("the mix reads two files at a time, and a source's own index only when the shared one names a window it hasn't got", async () => {
+  let inFlight = 0;
+  let most = 0;
+  const lagging: SeriesOverrides = { "1228/DE/day": { index: (SERIES["1228/DE/day"] as RecordedSeries).index.slice(0, -1), windows: {} } };
+  const mock = makeMockTransport(async (request) => {
+    inFlight++;
+    most = Math.max(most, inFlight);
+    await new Promise((resolve) => setImmediate(resolve));
+    inFlight--;
+    return smardAnswer(request, lagging);
+  });
+  const mix = await getGenerationMix(new SmardClient({ transport: mock.transport }), { at: "2026-11-10" });
+  assert.equal(most, 2);
+  assert.equal(mix.status, "ok");
+  if (mix.status !== "ok") return;
+  assert.deepEqual(mix.missing, [{ id: 1228, name: "Sonstige Erneuerbare" }], "its 2026 window not published: no value");
+  assert.deepEqual(mock.calls.filter((c) => c.url.includes("/index_")).map((c) => new URL(c.url).pathname), ["/app/chart_data/4067/DE/index_day.json", "/app/chart_data/1228/DE/index_day.json"]);
 });
 
 test("nuclear is left out after 15 April 2023 and said so; pumped storage is given apart, not in the total", async () => {
