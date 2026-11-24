@@ -559,6 +559,9 @@ async function inTurns<T, R>(items: readonly T[], limit: number, fn: (item: T) =
   return results;
 }
 
+/** Austria and Luxembourg (and their control areas) have no nuclear power: nothing to read or leave out. */
+const NO_NUCLEAR: ReadonlySet<Region> = new Set<Region>(["AT", "LU", "APG", "Creos"]);
+
 /** Germany's last three reactors went offline on 15 April 2023: no nuclear generation since. */
 const NUCLEAR_END = fromBerlin(2023, 4, 16);
 
@@ -642,7 +645,7 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
   const upstream = new Upstream(client);
   // A source SMARD hasn't for the region (TransnetBW has no lignite): left out and named.
   const absent = new Set<number>();
-  const order = [4067, ...ids.filter((id) => id !== 4067), NUCLEAR, PUMPED_STORAGE];
+  const order = [4067, ...ids.filter((id) => id !== 4067), ...(NO_NUCLEAR.has(region) ? [] : [NUCLEAR]), PUMPED_STORAGE];
   // One index for every source, they share their windows: Wind Onshore's, else the next source's.
   let sharedIndex: Promise<number[]> | undefined;
   const shared = (): Promise<number[]> =>
@@ -690,7 +693,7 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     }
     target = point[0];
     // The period read, not the date in at: 2023-06 at resolution year is the year 2023.
-    if (target < NUCLEAR_END) ids.splice(ids.indexOf(1227) + 1, 0, NUCLEAR);
+    if (target < NUCLEAR_END && !NO_NUCLEAR.has(region)) ids.splice(ids.indexOf(1227) + 1, 0, NUCLEAR);
   } else {
     const newest = new Map<number, number>();
     const settledOf = await inTurns(ids, MIX_PARALLEL, (id) => ofSource(id, (r) => r.lastSettled()));
@@ -711,7 +714,7 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     for (const [id, ts] of newest) if (ts < latest) behind.push({ id, name: info(id).name, newest: periodLabel(ts, resolution), ...(late(ts) ? { stalled: true } : {}) });
   }
 
-  if (!ids.includes(NUCLEAR)) ended.push({ id: NUCLEAR, name: info(NUCLEAR).name, note: "Germany's last reactors went offline on 15 April 2023; SMARD's series has no live values since, so it is left out." });
+  if (!ids.includes(NUCLEAR) && !NO_NUCLEAR.has(region)) ended.push({ id: NUCLEAR, name: info(NUCLEAR).name, note: "Germany's last reactors went offline on 15 April 2023; SMARD's series has no live values since, so it is left out." });
   const sources: MixSource[] = [];
   const missing: GenerationMix["missing"] = [];
   const valueAt = async (id: number): Promise<number | null> => {

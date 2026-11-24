@@ -278,6 +278,15 @@ test("a source that stopped publishing doesn't hold the mix back: the others are
   assert.match(mix.notes.join(" "), /Sonstige Erneuerbare \(newest 2026-11-05\) published nothing since: left out of 2026-11-18, the newest period the others have/);
 });
 
+test("a mix of Austria or Luxembourg has no nuclear to leave out", async () => {
+  const austria = Object.fromEntries([1223, 4069, 4071, 1227, 4067, 1225, 4068, 4066, 1226, 1228, 4070].map((id) => [`${id}/AT/day`, SERIES[`${id}/DE/day`]]));
+  const { client, mock } = api(austria);
+  const mix = await getGenerationMix(client, { region: "AT" });
+  assert.equal(mix.status, "ok");
+  if (mix.status === "ok") assert.deepEqual(mix.ended, []);
+  assert.ok(!mock.calls.some((c) => c.url.includes("/1224/")));
+});
+
 // --- getPrices ---
 
 test("the current price is the slot running now, not the last published one; the day's low and high with their times", async () => {
