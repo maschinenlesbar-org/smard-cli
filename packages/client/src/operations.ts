@@ -194,7 +194,7 @@ export interface SeriesInfo {
 /** English names and kinds of the documented series (FILTERS has the German labels). */
 const SERIES_EXTRA: Record<number, { name: string; nameEn: string; kind: SeriesKind; zone?: string; words?: string[] }> = {
   1223: { name: "Braunkohle", nameEn: "Lignite", kind: "fossil", words: ["braunkohle", "lignite", "brown coal"] },
-  4069: { name: "Steinkohle", nameEn: "Hard coal", kind: "fossil", words: ["steinkohle", "hard coal", "coal"] },
+  4069: { name: "Steinkohle", nameEn: "Hard coal", kind: "fossil", words: ["steinkohle", "hard coal"] },
   4071: { name: "Erdgas", nameEn: "Natural gas", kind: "fossil", words: ["erdgas", "gas", "natural gas"] },
   1227: { name: "Sonstige Konventionelle", nameEn: "Other conventional", kind: "fossil", words: ["sonstige konventionelle", "other conventional"] },
   1224: { name: "Kernenergie", nameEn: "Nuclear", kind: "nuclear", words: ["kernenergie", "nuclear", "atomkraft", "atom"] },
@@ -258,6 +258,11 @@ export function fold(text: string): string {
     .trim();
 }
 
+/** Whether `key` (folded) is a part of a series' German or English name or of one of its words ("coal" of "brown coal"). */
+function partOf(s: SeriesInfo, key: string): boolean {
+  return [s.name, s.nameEn, ...(SERIES_EXTRA[s.id]?.words ?? [])].some((name) => fold(name).includes(key));
+}
+
 /** A series a text names: one, several (ambiguous), or none. */
 type Lookup = { found: SeriesInfo } | { candidates: SeriesInfo[] } | { unknown: number } | { none: string };
 
@@ -283,7 +288,7 @@ function lookupSeries(value: string | number, among: readonly SeriesInfo[] = SER
   const exact = among.filter((s) => fold(s.name) === key || fold(s.nameEn) === key || s.zone?.toLowerCase() === text.toLowerCase() || (SERIES_EXTRA[s.id]?.words ?? []).some((w) => fold(w) === key));
   if (exact.length === 1) return { found: exact[0] as SeriesInfo };
   if (exact.length > 1) return { candidates: exact };
-  const partial = among.filter((s) => fold(s.name).includes(key) || fold(s.nameEn).includes(key));
+  const partial = among.filter((s) => partOf(s, key));
   if (partial.length === 1) return { found: partial[0] as SeriesInfo };
   if (partial.length > 1) return { candidates: partial };
   return { none: text };
@@ -1188,7 +1193,7 @@ export function listSeries(input: { group?: string; query?: string } = {}): Seri
     } else {
       if (!/\p{L}/u.test(text)) throw new SmardValidationError(`Invalid query ${quoteValue(text)}. Expected a part of a series' name or a series id.`);
       const key = fold(text);
-      series = series.filter((s) => fold(s.name).includes(key) || fold(s.nameEn).includes(key) || (SERIES_EXTRA[s.id]?.words ?? []).some((w) => fold(w) === key) || fold(s.zone ?? "") === key);
+      series = series.filter((s) => partOf(s, key) || fold(s.zone ?? "") === key);
     }
     searched["query"] = input.query;
   }

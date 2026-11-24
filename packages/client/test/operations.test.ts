@@ -512,6 +512,17 @@ test("id-shaped text that isn't an id is refused, never matched as part of a nam
   assert.equal(dk.status === "ok" || dk.status === "empty", true, "DK-1 is a name of Denmark 1");
 });
 
+test("coal is lignite or hard coal, as Kohle is: ambiguous in both languages, and listSeries lists both", async () => {
+  for (const word of ["coal", "Kohle"]) {
+    const found = await getSeries(api().client, { series: word });
+    assert.equal(found.status, "ambiguous", word);
+    if (found.status === "ambiguous") assert.deepEqual(found.candidates.map((c) => c.id), [1223, 4069], word);
+    assert.deepEqual(listSeries({ query: word }).series.map((s) => s.id), [1223, 4069], word);
+  }
+  const hard = await getSeries(api().client, { series: "hard coal", resolution: "day", from: "2026-11-18", to: "2026-11-18" });
+  assert.equal(hard.status, "ok");
+});
+
 // --- listSeries, listWindows ---
 
 test("listSeries: a group, a word, the regions and what one window of each resolution holds", () => {
