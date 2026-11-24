@@ -10,7 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listTools } from "../src/mcp/server.js";
 import { connect, recorder } from "./harness.js";
-import { makeMockTransport, rawResponse, smardApi } from "./helpers.js";
+import { makeMockTransport, rawResponse, SERIES, smardApi } from "./helpers.js";
 
 const BASE = "https://www.smard.de/app";
 
@@ -122,5 +122,15 @@ test("a base URL that reaches no SMARD is a tool error and a WARN record, never 
     assert.match(result.content[0]?.text ?? "", /HTTP 404 for GET .*grid load \(410, DE, hour\), which SMARD always has, is a 404 too: the base URL is wrong/);
   }
   assert.ok(log.lines.some((line) => /WARN  \[smard-mcp\.api\] getSeries: HTTP 404/.test(line)), log.lines.join("\n"));
+  await connection.close();
+});
+
+test("getGenerationMix for a control area without some sources answers the others and names the absent ones", async () => {
+  const transnet = Object.fromEntries([4069, 4071, 1227, 4067, 4068, 4066, 1226, 1228, 4070].map((id) => [`${id}/TransnetBW/day`, SERIES[`${id}/DE/day`]]));
+  const connection = await connect({ transport: smardApi(transnet) });
+  const result = await connection.call("getGenerationMix", { region: "TransnetBW" });
+  const content = result.structuredContent ?? {};
+  assert.equal(content["status"], "ok", result.content[0]?.text);
+  assert.deepEqual(content["absent"], [{ id: 1223, name: "Braunkohle" }, { id: 1225, name: "Wind Offshore" }]);
   await connection.close();
 });

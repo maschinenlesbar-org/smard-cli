@@ -379,7 +379,8 @@ const is404 = (err: unknown): err is SmardApiError => err instanceof SmardApiErr
  * One series' index and the windows read so far, so a use case reads each file once. With
  * `shared`, the series takes another's index (the series of one region and resolution share their
  * windows), so the mix reads one index instead of eleven; a window of it this series hasn't got
- * (a 404) makes it read its own.
+ * (a 404) makes it read its own: a 404 for that too means SMARD hasn't the series, otherwise the
+ * window has no values for it.
  */
 class SeriesReader {
   private index: Promise<number[]> | undefined;
@@ -392,15 +393,16 @@ class SeriesReader {
     readonly region: Region,
     readonly resolution: Resolution,
     readonly upstream: Upstream = new Upstream(client),
-    private readonly shared?: SeriesReader,
+    private readonly shared?: () => Promise<number[]>,
   ) {}
 
   /** The window starts, oldest first: the series' own index, or the shared one until a window of it is missing. */
   starts(): Promise<number[]> {
-    return this.index === undefined && this.shared !== undefined ? this.shared.starts() : this.ownStarts();
+    return this.index === undefined && this.shared !== undefined ? this.shared() : this.ownStarts();
   }
 
-  private ownStarts(): Promise<number[]> {
+  /** The series' own index, oldest first (read once). */
+  ownStarts(): Promise<number[]> {
     this.index ??= this.client.timestamps(this.filter, this.region, this.resolution).then((index) => {
       this.upstream.ok();
       return [...index].sort((a, b) => a - b);
@@ -421,9 +423,10 @@ class SeriesReader {
       try {
         file = await this.client.series(this.filter, this.region, this.resolution, start);
       } catch (err) {
-        // The shared index named a window this series hasn't got: its own index says whether it has.
-        if (this.shared === undefined || this.index !== undefined || !is404(err)) throw err;
-        if ((await this.ownStarts()).includes(start)) throw err;
+        // The shared index named a window this series hasn't got: its own index says whether SMARD
+        // has the series at all (its 404 is thrown); if so, the window has no values for it.
+        if (this.shared === undefined || !is404(err)) throw err;
+        await this.ownStarts();
         this.windows.set(start, []);
         return [];
       }
@@ -578,6 +581,8 @@ export interface GenerationMix {
   ended: { id: number; name: string; note: string }[];
   /** Sources with no value for the period (not published yet): the total is without them. */
   missing: { id: number; name: string }[];
+  /** Sources (and pumped storage) SMARD publishes no series of for the region (a 404 for the index): the total is without them. */
+  absent: { id: number; name: string }[];
   /** Sources whose newest settled value is older than the others': every source is read at their period. */
   behind: { id: number; name: string; newest: string }[];
   notes: string[];
@@ -608,85 +613,116 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     return false;
   });
   const upstream = new Upstream(client);
-  // One index (Wind Onshore's) for every source: they share their windows.
-  const reference = new SeriesReader(client, 4067, region, resolution, upstream);
-  const readers = new Map([...ids, PUMPED_STORAGE].map((id) => [id, id === reference.filter ? reference : new SeriesReader(client, id, region, resolution, upstream, reference)]));
-  const reader = (id: number) => readers.get(id) as SeriesReader;
-
-  try {
-    // The period: the one `at` names, or the newest all sources have settled.
-    let target: number;
-    const behind: GenerationMix["behind"] = [];
-    if (at !== undefined) {
-      const point = await reader(4067).pointAt(at.start);
-      if (point === undefined) return { status: "empty", searched, reason: `SMARD's ${resolution} series start later than ${input.at}: ask for a later period.` };
-      target = point[0];
-    } else {
-      const newest = new Map<number, number>();
-      const settledOf = await inTurns(ids, MIX_PARALLEL, (id) => reader(id).lastSettled());
-      ids.forEach((id, i) => {
-        const settled = settledOf[i];
-        if (settled !== undefined) newest.set(id, settled[0]);
-      });
-      if (newest.size === 0) return { status: "empty", searched, reason: `No source has settled ${resolution} data in region ${region} yet.` };
-      target = Math.min(...newest.values());
-      const latest = Math.max(...newest.values());
-      if (latest > target) {
-        for (const [id, ts] of newest) if (ts < latest) behind.push({ id, name: info(id).name, newest: periodLabel(ts, resolution) });
+  // A source SMARD hasn't for the region (TransnetBW has no lignite): left out and named.
+  const absent = new Set<number>();
+  const order = [4067, ...ids.filter((id) => id !== 4067), PUMPED_STORAGE];
+  // One index for every source, they share their windows: Wind Onshore's, else the next source's.
+  let sharedIndex: Promise<number[]> | undefined;
+  const shared = (): Promise<number[]> =>
+    (sharedIndex ??= (async () => {
+      for (const id of order) {
+        try {
+          return await reader(id).ownStarts();
+        } catch (err) {
+          await upstream.absent(err, id, region, resolution);
+          absent.add(id);
+        }
       }
+      return [];
+    })());
+  const readers = new Map(order.map((id) => [id, new SeriesReader(client, id, region, resolution, upstream, shared)]));
+  const reader = (id: number) => readers.get(id) as SeriesReader;
+  /** `read` of a source, or undefined when SMARD hasn't the source for the region (a 404 for its index). */
+  const ofSource = async <T>(id: number, read: (r: SeriesReader) => Promise<T>): Promise<T | undefined> => {
+    if (absent.has(id)) return undefined;
+    try {
+      return await read(reader(id));
+    } catch (err) {
+      await upstream.absent(err, id, region, resolution);
+      absent.add(id);
+      return undefined;
     }
+  };
+  const absentOnes = () => order.filter((id) => absent.has(id)).map((id) => ({ id, name: info(id).name }));
 
-    const sources: MixSource[] = [];
-    const missing: GenerationMix["missing"] = [];
-    const valueAt = async (id: number): Promise<number | null> => {
-      const point = await reader(id).pointAt(target);
-      return point !== undefined && point[0] === target ? point[1] : null;
-    };
-    const values = await inTurns(ids, MIX_PARALLEL, valueAt);
-    for (const [i, id] of ids.entries()) {
-      const value = values[i] as number | null;
-      const s = info(id);
-      if (value === null) missing.push({ id, name: s.name });
-      else sources.push({ id, name: s.name, nameEn: s.nameEn, kind: s.kind as MixSource["kind"], mwh: value, share: 0 });
-    }
-    const label = periodLabel(target, resolution);
-    if (sources.length === 0) {
-      return { status: "empty", searched, reason: `No settled ${resolution} data for ${label} in region ${region} yet (the values are not published). Leave out at for the newest settled period.` };
-    }
-    const pumped = await valueAt(PUMPED_STORAGE);
-    const total = sources.reduce((sum, s) => sum + s.mwh, 0);
-    const shareOf = (kind: MixSource["kind"]) => (total > 0 ? round1((sources.filter((s) => s.kind === kind).reduce((sum, s) => sum + s.mwh, 0) / total) * 100) : 0);
-    for (const s of sources) s.share = total > 0 ? round1((s.mwh / total) * 100) : 0;
-    sources.sort((a, b) => b.mwh - a.mwh || a.id - b.id);
-
-    const notes: string[] = [];
-    if (behind.length > 0) notes.push(`${behind.map((b) => `${b.name} (newest ${b.newest})`).join(", ")} ${behind.length === 1 ? "lags" : "lag"} behind the others; every source is read at ${label}, the newest period all have.`);
-    if (missing.length > 0) notes.push(`${missing.map((m) => m.name).join(", ")}: no value for ${label} yet; the total and the shares are without ${missing.length === 1 ? "it" : "them"}.`);
-    notes.push(`Values are energy over the ${resolution} in MWh (1 TWh = 1,000,000 MWh). Pumped storage is storage, not generation: not in the total.`);
-    const window = (await reader(4067).windowAt(target)) ?? target;
-    return {
-      status: "ok",
-      region,
-      resolution,
-      period: { start: berlinTime(target), label },
-      unit: "MWh",
-      totalMWh: round2(total),
-      renewableShare: shareOf("renewable"),
-      fossilShare: shareOf("fossil"),
-      ...(sources.some((s) => s.kind === "nuclear") ? { nuclearShare: shareOf("nuclear") } : {}),
-      sources,
-      pumpedStorage: { id: PUMPED_STORAGE, mwh: pumped },
-      ended,
-      missing,
-      behind,
-      notes,
-      searched,
-      window,
-    };
-  } catch (err) {
-    await upstream.absent(err, 4067, region, resolution);
-    return noSuchSeries(4067, region, resolution, searched);
+  // The period: the one `at` names, or the newest all sources have settled.
+  let target: number;
+  const behind: GenerationMix["behind"] = [];
+  const windows = await shared();
+  if (ids.every((id) => absent.has(id))) {
+    return { status: "empty", searched, reason: `SMARD publishes none of the generation series for region ${region} at resolution ${resolution} (HTTP 404). Not every region has every resolution; DE has all.` };
   }
+  if (at !== undefined) {
+    let point: SeriesPoint | undefined;
+    for (const id of ids) if (point === undefined) point = await ofSource(id, (r) => r.pointAt(at.start));
+    if (point === undefined) return { status: "empty", searched, reason: `SMARD's ${resolution} series start later than ${input.at}: ask for a later period.` };
+    target = point[0];
+  } else {
+    const newest = new Map<number, number>();
+    const settledOf = await inTurns(ids, MIX_PARALLEL, (id) => ofSource(id, (r) => r.lastSettled()));
+    ids.forEach((id, i) => {
+      const settled = settledOf[i];
+      if (settled !== undefined) newest.set(id, settled[0]);
+    });
+    if (newest.size === 0) return { status: "empty", searched, reason: `No source has settled ${resolution} data in region ${region} yet.` };
+    target = Math.min(...newest.values());
+    const latest = Math.max(...newest.values());
+    if (latest > target) {
+      for (const [id, ts] of newest) if (ts < latest) behind.push({ id, name: info(id).name, newest: periodLabel(ts, resolution) });
+    }
+  }
+
+  const sources: MixSource[] = [];
+  const missing: GenerationMix["missing"] = [];
+  const valueAt = async (id: number): Promise<number | null> => {
+    const point = await ofSource(id, (r) => r.pointAt(target));
+    return point !== undefined && point[0] === target ? point[1] : null;
+  };
+  const values = await inTurns(ids, MIX_PARALLEL, valueAt);
+  for (const [i, id] of ids.entries()) {
+    if (absent.has(id)) continue;
+    const value = values[i] as number | null;
+    const s = info(id);
+    if (value === null) missing.push({ id, name: s.name });
+    else sources.push({ id, name: s.name, nameEn: s.nameEn, kind: s.kind as MixSource["kind"], mwh: value, share: 0 });
+  }
+  const label = periodLabel(target, resolution);
+  if (sources.length === 0) {
+    return { status: "empty", searched, reason: `No settled ${resolution} data for ${label} in region ${region} yet (the values are not published). Leave out at for the newest settled period.` };
+  }
+  const pumped = await valueAt(PUMPED_STORAGE);
+  const total = sources.reduce((sum, s) => sum + s.mwh, 0);
+  const shareOf = (kind: MixSource["kind"]) => (total > 0 ? round1((sources.filter((s) => s.kind === kind).reduce((sum, s) => sum + s.mwh, 0) / total) * 100) : 0);
+  for (const s of sources) s.share = total > 0 ? round1((s.mwh / total) * 100) : 0;
+  sources.sort((a, b) => b.mwh - a.mwh || a.id - b.id);
+
+  const notes: string[] = [];
+  const gone = absentOnes().filter((a) => a.id !== PUMPED_STORAGE);
+  if (gone.length > 0) notes.push(`SMARD publishes no ${gone.map((a) => a.name).join(", ")} series for region ${region} (HTTP 404): the total and the shares are without ${gone.length === 1 ? "it" : "them"}.`);
+  if (behind.length > 0) notes.push(`${behind.map((b) => `${b.name} (newest ${b.newest})`).join(", ")} ${behind.length === 1 ? "lags" : "lag"} behind the others; every source is read at ${label}, the newest period all have.`);
+  if (missing.length > 0) notes.push(`${missing.map((m) => m.name).join(", ")}: no value for ${label} yet; the total and the shares are without ${missing.length === 1 ? "it" : "them"}.`);
+  notes.push(`Values are energy over the ${resolution} in MWh (1 TWh = 1,000,000 MWh). Pumped storage is storage, not generation: not in the total.`);
+  const window = windows.filter((start) => start <= target).pop() ?? target;
+  return {
+    status: "ok",
+    region,
+    resolution,
+    period: { start: berlinTime(target), label },
+    unit: "MWh",
+    totalMWh: round2(total),
+    renewableShare: shareOf("renewable"),
+    fossilShare: shareOf("fossil"),
+    ...(sources.some((s) => s.kind === "nuclear") ? { nuclearShare: shareOf("nuclear") } : {}),
+    sources,
+    pumpedStorage: { id: PUMPED_STORAGE, mwh: pumped },
+    ended,
+    missing,
+    absent: absentOnes(),
+    behind,
+    notes,
+    searched,
+    window,
+  };
 }
 
 // --- getPrices ----------------------------------------------------------------------------------

@@ -155,7 +155,43 @@ test("a period not published yet is empty, saying so; a region without the serie
   if (future.status === "empty") assert.match(future.reason, /No settled day data for 2026-11-25 in region DE yet/);
   const tennet = await getGenerationMix(api().client, { region: "tennet" });
   assert.equal(tennet.status, "empty");
-  if (tennet.status === "empty") assert.match(tennet.reason, /SMARD publishes no series 4067 for region TenneT at resolution day \(HTTP 404\)/);
+  if (tennet.status === "empty") assert.match(tennet.reason, /SMARD publishes none of the generation series for region TenneT at resolution day \(HTTP 404\)/);
+});
+
+/** The recorded DE day series of `ids` as region `region`'s. */
+function asRegion(region: string, ids: number[]): SeriesOverrides {
+  return Object.fromEntries(ids.map((id) => [`${id}/${region}/day`, SERIES[`${id}/DE/day`]]));
+}
+
+test("a control area without some sources (TransnetBW has no lignite, no offshore wind) gives its mix from the others, naming the absent ones", async () => {
+  const { client, mock } = api(asRegion("TransnetBW", [4069, 4071, 1227, 4067, 4068, 4066, 1226, 1228, 4070]));
+  const mix = await getGenerationMix(client, { region: "TransnetBW" });
+  assert.equal(mix.status, "ok", JSON.stringify(mix));
+  if (mix.status !== "ok") return;
+  assert.deepEqual(mix.absent, [{ id: 1223, name: "Braunkohle" }, { id: 1225, name: "Wind Offshore" }]);
+  assert.equal(mix.sources.length, 8);
+  assert.ok(!mix.sources.some((s) => s.id === 1223 || s.id === 1225));
+  assert.match(mix.notes.join(" "), /SMARD publishes no Braunkohle, Wind Offshore series for region TransnetBW \(HTTP 404\): the total and the shares are without them/);
+  assert.ok(!mock.calls.some((c) => c.url.includes("/410/")), "SMARD answered: no check needed");
+});
+
+test("a window file one source lacks, or pumped storage absent, or Wind Onshore absent, never empties the mix", async () => {
+  const noWindow: SeriesOverrides = { "1228/DE/day": { index: (SERIES["1228/DE/day"] as RecordedSeries).index, windows: {} } };
+  const one = await getGenerationMix(api(noWindow).client);
+  assert.equal(one.status, "ok");
+  if (one.status === "ok") assert.deepEqual(one.missing, [{ id: 1228, name: "Sonstige Erneuerbare" }]);
+  const noPumped = await getGenerationMix(api({ "4070/DE/day": undefined }).client);
+  assert.equal(noPumped.status, "ok");
+  if (noPumped.status === "ok") {
+    assert.deepEqual(noPumped.pumpedStorage, { id: 4070, mwh: null });
+    assert.deepEqual(noPumped.absent, [{ id: 4070, name: "Pumpspeicher (Erzeugung)" }]);
+  }
+  const noOnshore = await getGenerationMix(api({ "4067/DE/day": undefined }).client, { at: "2026-11-10" });
+  assert.equal(noOnshore.status, "ok");
+  if (noOnshore.status === "ok") {
+    assert.equal(noOnshore.period.label, "2026-11-10");
+    assert.deepEqual(noOnshore.absent, [{ id: 4067, name: "Wind Onshore" }]);
+  }
 });
 
 test("before 16 April 2023 nuclear is in the mix, with its own share", async () => {
