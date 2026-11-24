@@ -105,6 +105,15 @@ export function nextPeriod(ms: number, resolution: Resolution): number {
   return fromBerlin(f.year + 1, f.month, f.day, f.hour, f.minute);
 }
 
+/** The period a time a caller gave spans: a year, a month, a day, or less (undefined). */
+function spanOf(span: TimeSpan): "year" | "month" | "day" | undefined {
+  const length = span.end - span.start;
+  if (length > 32 * 86_400_000) return "year";
+  if (length > 26 * 3_600_000) return "month";
+  if (length > 2 * 3_600_000) return "day";
+  return undefined;
+}
+
 /** A time a caller gave: where it starts and where the period it names ends (exclusive). */
 export interface TimeSpan {
   start: number;
@@ -615,8 +624,10 @@ export interface GenerationMix {
  */
 export async function getGenerationMix(client: SmardClient, input: GenerationMixInput = {}): Promise<GenerationMix | Empty> {
   const region = resolveRegion(input.region, "DE");
-  const resolution = resolveResolution(input.resolution, "day");
   const at = input.at === undefined ? undefined : parseTime("at", input.at, input.now);
+  // A year or month in at, without a resolution, is that year or month: "the mix in 2025".
+  const spanned = at === undefined ? undefined : spanOf(at);
+  const resolution = resolveResolution(input.resolution, spanned === "year" || spanned === "month" ? spanned : "day");
   const searched = { region, resolution, ...(input.at === undefined ? {} : { at: input.at }) };
   const info = (id: number) => SERIES_INFO.find((s) => s.id === id) as SeriesInfo;
   const ended: GenerationMix["ended"] = [];
@@ -719,6 +730,9 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
   if (gone.length > 0) notes.push(`SMARD publishes no ${gone.map((a) => a.name).join(", ")} series for region ${region} (HTTP 404): the total and the shares are without ${gone.length === 1 ? "it" : "them"}.`);
   if (behind.length > 0) notes.push(`${behind.map((b) => `${b.name} (newest ${b.newest})`).join(", ")} ${behind.length === 1 ? "lags" : "lag"} behind the others; every source is read at ${label}, the newest period all have.`);
   if (missing.length > 0) notes.push(`${missing.map((m) => m.name).join(", ")}: no value for ${label} yet; the total and the shares are without ${missing.length === 1 ? "it" : "them"}.`);
+  if (at !== undefined && spanned !== undefined && nextPeriod(target, resolution) < at.end) {
+    notes.push(`${input.at} spans more than one ${resolution}: this is its first, ${label}. For all of it, ask with resolution ${spanned}.`);
+  }
   notes.push(`Values are energy over the ${resolution} in MWh (1 TWh = 1,000,000 MWh). Pumped storage is storage, not generation: not in the total.`);
   const window = windows.filter((start) => start <= target).pop() ?? target;
   return {

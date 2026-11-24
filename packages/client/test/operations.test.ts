@@ -243,6 +243,28 @@ test("nuclear is counted by the period read, not by the date in at: 2023 and 202
   }
 });
 
+test("a year or month in at without a resolution reads that year or month; with a finer resolution its first period is said", async () => {
+  const overrides: SeriesOverrides = {};
+  const year = fromBerlin(2025, 1);
+  const october = fromBerlin(2026, 10);
+  for (const id of [1223, 4069, 4071, 1227, 4067, 1225, 4068, 4066, 1226, 1228, 4070]) {
+    overrides[`${id}/DE/year`] = { index: [year], windows: { [String(year)]: [year, 86_400_000, [365]] } };
+    overrides[`${id}/DE/month`] = { index: [fromBerlin(2026, 1)], windows: { [String(fromBerlin(2026, 1))]: [october, 86_400_000, [31]] } };
+  }
+  const y = await getGenerationMix(api(overrides).client, { at: "2025" });
+  assert.equal(y.status, "ok");
+  if (y.status === "ok") assert.deepEqual([y.resolution, y.period.label, y.totalMWh], ["year", "2025", 3650]);
+  const m = await getGenerationMix(api(overrides).client, { at: "2026-10" });
+  assert.equal(m.status, "ok");
+  if (m.status === "ok") assert.deepEqual([m.resolution, m.period.label], ["month", "2026-10"]);
+  const firstDay = await getGenerationMix(api().client, { at: "2026-11", resolution: "day" });
+  assert.equal(firstDay.status, "ok");
+  if (firstDay.status === "ok") {
+    assert.equal(firstDay.period.label, "2026-11-01");
+    assert.match(firstDay.notes.join(" "), /2026-11 spans more than one day: this is its first, 2026-11-01\. For all of it, ask with resolution month/);
+  }
+});
+
 // --- getPrices ---
 
 test("the current price is the slot running now, not the last published one; the day's low and high with their times", async () => {
