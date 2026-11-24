@@ -43,7 +43,7 @@ const output = (properties: Record<string, JsonSchema>): JsonSchema => ({
     status: { type: "string", enum: ["ok", "ambiguous", "empty"], description: "ok: the answer; ambiguous: a name fits several series or zones, ask which one and call again with its id or zone code; empty: nothing published for what was asked (see reason)." },
     source: { type: "string" },
     licence: { type: "string" },
-    truncated: { type: "boolean", description: "True when the answer holds only part of the list (size cap): continue at nextOffset." },
+    truncated: { type: "boolean", description: "True when the answer holds only part of the list (size cap): continue at nextOffset; or a text cut at its end (it ends in \"…[cut, N characters in all]\")." },
     reason: { type: "string" },
     searched: { type: "object" },
     notes: { type: "array" },
