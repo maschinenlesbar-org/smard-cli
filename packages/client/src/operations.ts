@@ -618,15 +618,12 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
   const searched = { region, resolution, ...(input.at === undefined ? {} : { at: input.at }) };
   const info = (id: number) => SERIES_INFO.find((s) => s.id === id) as SeriesInfo;
   const ended: GenerationMix["ended"] = [];
-  const ids = MIX_SOURCES.filter((id) => {
-    if (id !== NUCLEAR || (at !== undefined && at.start < NUCLEAR_END)) return true;
-    ended.push({ id, name: info(id).name, note: "Germany's last reactors went offline on 15 April 2023; SMARD's series has no live values since, so it is left out." });
-    return false;
-  });
+  // Nuclear joins once the period is known: it counts in a period that starts before 16 April 2023.
+  const ids = MIX_SOURCES.filter((id) => id !== NUCLEAR);
   const upstream = new Upstream(client);
   // A source SMARD hasn't for the region (TransnetBW has no lignite): left out and named.
   const absent = new Set<number>();
-  const order = [4067, ...ids.filter((id) => id !== 4067), PUMPED_STORAGE];
+  const order = [4067, ...ids.filter((id) => id !== 4067), NUCLEAR, PUMPED_STORAGE];
   // One index for every source, they share their windows: Wind Onshore's, else the next source's.
   let sharedIndex: Promise<number[]> | undefined;
   const shared = (): Promise<number[]> =>
@@ -673,6 +670,8 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
       return { status: "empty", searched, reason: `Nothing published for ${input.at} at resolution ${resolution} in region ${region} yet: SMARD publishes a period after it ends. Leave out at for the newest settled period.` };
     }
     target = point[0];
+    // The period read, not the date in at: 2023-06 at resolution year is the year 2023.
+    if (target < NUCLEAR_END) ids.splice(ids.indexOf(1227) + 1, 0, NUCLEAR);
   } else {
     const newest = new Map<number, number>();
     const settledOf = await inTurns(ids, MIX_PARALLEL, (id) => ofSource(id, (r) => r.lastSettled()));
@@ -688,6 +687,7 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     }
   }
 
+  if (!ids.includes(NUCLEAR)) ended.push({ id: NUCLEAR, name: info(NUCLEAR).name, note: "Germany's last reactors went offline on 15 April 2023; SMARD's series has no live values since, so it is left out." });
   const sources: MixSource[] = [];
   const missing: GenerationMix["missing"] = [];
   const valueAt = async (id: number): Promise<number | null> => {

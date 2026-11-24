@@ -219,6 +219,30 @@ test("before 16 April 2023 nuclear is in the mix, with its own share", async () 
   assert.equal(mix.fossilShare, 20);
 });
 
+test("nuclear is counted by the period read, not by the date in at: 2023 and 2023-06 at year are one answer", async () => {
+  const mixOf = async (resolution: "year" | "month" | "week", start: number, ats: string[]) => {
+    const overrides: SeriesOverrides = {};
+    for (const id of [1223, 4069, 4071, 1227, 1224, 4067, 1225, 4068, 4066, 1226, 1228, 4070]) {
+      overrides[`${id}/DE/${resolution}`] = { index: [start], windows: { [String(start)]: [start, 86_400_000, [id === 1224 ? 1000 : 100]] } };
+    }
+    return Promise.all(ats.map((at) => getGenerationMix(api(overrides).client, { resolution, at })));
+  };
+  for (const [resolution, start, ats] of [
+    ["year", fromBerlin(2023, 1), ["2023", "2023-06", "2023-12-31"]],
+    ["month", fromBerlin(2023, 4), ["2023-04", "2023-04-20"]],
+    ["week", fromBerlin(2023, 4, 10), ["2023-04-10", "2023-04-16"]],
+  ] as const) {
+    const answers = await mixOf(resolution, start, [...ats]);
+    for (const [i, mix] of answers.entries()) {
+      assert.equal(mix.status, "ok", `${resolution} ${ats[i]}`);
+      if (mix.status !== "ok") continue;
+      assert.equal(mix.nuclearShare, 50, `${resolution} ${ats[i]}: nuclear ran until 15 April 2023, inside the period`);
+      assert.deepEqual(mix.ended, []);
+      assert.equal(mix.totalMWh, 2000);
+    }
+  }
+});
+
 // --- getPrices ---
 
 test("the current price is the slot running now, not the last published one; the day's low and high with their times", async () => {
