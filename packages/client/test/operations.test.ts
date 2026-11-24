@@ -455,6 +455,24 @@ test("the unpublished tail is left out and counted; gaps are dropped, or kept as
   assert.equal(kept.nulls.kept, 1);
 });
 
+test("nulls at the end of a past range are gaps, kept with nulls keep: only those after SMARD's newest value are unpublished", async () => {
+  const recorded = SERIES["410/DE/hour"] as RecordedSeries;
+  const week = 1794178800000;
+  const [first, step, values] = recorded.windows[String(week)] as [number, number, (number | null)[]];
+  const tail: SeriesOverrides = { "410/DE/hour": { index: recorded.index, windows: { ...recorded.windows, [String(week)]: [first, step, values.map((v, i) => (i >= values.length - 10 ? null : v))] } } };
+  const kept = await getSeries(api(tail).client, { series: 410, from: "2026-11-09", to: "2026-11-15", nulls: "keep", now: NOW });
+  assert.equal(kept.status, "ok");
+  if (kept.status !== "ok") return;
+  assert.equal(kept.rows.length, 168);
+  assert.deepEqual(kept.nulls, { kept: 10, dropped: 0, unpublished: 0 });
+  assert.equal(kept.last, "2026-11-15T22:00:00Z");
+  const dropped = await getSeries(api(tail).client, { series: 410, from: "2026-11-09", to: "2026-11-15", now: NOW });
+  assert.equal(dropped.status, "ok");
+  if (dropped.status !== "ok") return;
+  assert.deepEqual(dropped.nulls, { kept: 0, dropped: 10, unpublished: 0 });
+  assert.doesNotMatch(dropped.notes.join(" "), /not published yet/);
+});
+
 test("day rows carry the Berlin date, never the UTC one (todate would name the day before)", async () => {
   const rows = await getSeries(api().client, { series: "pv", resolution: "day", from: "2026-11-01", to: "2026-11-03", now: NOW });
   assert.equal(rows.status, "ok");

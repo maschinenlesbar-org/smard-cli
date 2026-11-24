@@ -1139,12 +1139,14 @@ export async function getSeries(client: SmardClient, input: SeriesInput): Promis
   for (const start of wanted) for (const [t, v] of await reader.points(start)) if (!byTime.has(t) || byTime.get(t) === null) byTime.set(t, v);
   const lower = from?.start ?? Number.MIN_SAFE_INTEGER;
   const points = [...byTime].filter(([t]) => t >= lower && t < upper).sort((a, b) => a[0] - b[0]);
-  let lastSettled = -1;
-  points.forEach(([, v], i) => {
-    if (v !== null) lastSettled = i;
-  });
-  const unpublished = points.length - 1 - lastSettled;
-  const inside = points.slice(0, lastSettled + 1);
+  // The unpublished tail: the nulls after SMARD's newest value, which only the newest two windows
+  // can hold. Nulls at the end of a range before it are gaps, kept with nulls keep.
+  const touchesNewest = wanted.some((start) => starts.slice(-2).includes(start));
+  const settledAt = touchesNewest ? ((settled ?? (await reader.lastSettled()))?.[0] ?? -Infinity) : Infinity;
+  let end = points.length;
+  while (end > 0 && (points[end - 1] as [number, number | null])[1] === null && (points[end - 1] as [number, number | null])[0] > settledAt) end--;
+  const unpublished = points.length - end;
+  const inside = points.slice(0, end);
   const gaps = inside.filter(([, v]) => v === null).length;
   const keep = input.nulls === "keep";
   const subDay = resolution === "hour" || resolution === "quarterhour";
