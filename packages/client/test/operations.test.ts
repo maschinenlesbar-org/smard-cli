@@ -360,6 +360,21 @@ test("Sunday night before the new week's first slot: the current price comes fro
   assert.equal(prices.zones[0]?.slots, 96);
 });
 
+test("just after Monday midnight, a zone whose new week isn't listed yet has no current price: never Sunday's last slot", async () => {
+  const recorded = SERIES["4169/DE-LU/quarterhour"] as RecordedSeries;
+  const late: SeriesOverrides = { "4169/DE-LU/quarterhour": { index: recorded.index.slice(0, -1), windows: recorded.windows } };
+  const monday = new Date("2026-11-15T23:10:00Z");
+  const prices = await getPrices(api(late).client, { now: monday, zones: ["DE-LU", "FR"] });
+  assert.equal(prices.status, "ok");
+  if (prices.status !== "ok") return;
+  const [de, fr] = prices.zones;
+  assert.equal(de?.current, undefined, JSON.stringify(de?.current));
+  assert.equal(de?.published, false);
+  assert.equal(fr?.current?.time, "2026-11-16T00:00+01:00");
+  assert.deepEqual(prices.comparison?.ranking.map((r) => r.zone), ["FR"]);
+  assert.deepEqual(prices.comparison?.notIncluded, ["DE-LU"]);
+});
+
 test("a zone name several zones fit is ambiguous; an unknown zone or a non-price id is refused before any request", async () => {
   const denmark = await getPrices(api().client, { now: NOW, zones: ["Dänemark"] });
   assert.equal(denmark.status, "ambiguous");

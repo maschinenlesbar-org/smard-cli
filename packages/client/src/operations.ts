@@ -899,8 +899,10 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
     if (settled !== undefined) result.publishedUntil = berlinTime(settled[0]);
     if (isToday) {
       result.tomorrowPublished = settled !== undefined && settled[0] >= day.end;
+      // The slot running now: one whose period holds now, never the last slot of an older window
+      // (a zone whose new week isn't listed yet just after Monday midnight).
       const current = await reader.pointAt(now.getTime());
-      if (current !== undefined && current[1] !== null) {
+      if (current !== undefined && current[1] !== null && nextPeriod(current[0], resolution) > now.getTime()) {
         currents.set(result.zone, current as [number, number]);
         result.current = priceAt(current as [number, number]);
       }
