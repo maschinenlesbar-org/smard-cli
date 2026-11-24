@@ -9,8 +9,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { listTools } from "../src/mcp/server.js";
-import { connect } from "./harness.js";
-import { smardApi } from "./helpers.js";
+import { connect, recorder } from "./harness.js";
+import { makeMockTransport, rawResponse, smardApi } from "./helpers.js";
 
 const BASE = "https://www.smard.de/app";
 
@@ -110,5 +110,17 @@ test("listSeries and listWindows answer through the protocol", async () => {
   assert.equal(windows["nextOffset"], 2);
   assert.equal(windows["oldest"], "2015-01-01");
   assert.equal(windows["source"], `${BASE}/chart_data/4068/DE/index_day.json`);
+  await connection.close();
+});
+
+test("a base URL that reaches no SMARD is a tool error and a WARN record, never an empty 'no such series' answer", async () => {
+  const log = recorder();
+  const connection = await connect({ transport: makeMockTransport(() => rawResponse("<html>Seite nicht gefunden</html>", "text/html", 404)), log: log.log });
+  for (const [tool, args] of [["listWindows", { series: "410" }], ["getSeries", { series: "Netzlast" }], ["getPrices", {}], ["getGenerationMix", {}]] as const) {
+    const result = await connection.call(tool, args);
+    assert.equal(result.isError, true, `${tool}: ${result.content[0]?.text}`);
+    assert.match(result.content[0]?.text ?? "", /HTTP 404 for GET .*grid load \(410, DE, hour\), which SMARD always has, is a 404 too: the base URL is wrong/);
+  }
+  assert.ok(log.lines.some((line) => /WARN  \[smard-mcp\.api\] getSeries: HTTP 404/.test(line)), log.lines.join("\n"));
   await connection.close();
 });

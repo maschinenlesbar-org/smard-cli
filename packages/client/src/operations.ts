@@ -14,7 +14,9 @@
 // null (unpublished): the last settled point is the last non-null one, never the last one. SMARD's
 // periods follow the Europe/Berlin calendar: a day starts at Berlin midnight (22:00Z or 23:00Z the
 // UTC day before), so periods are named by their Berlin date and times carry the Berlin offset.
-// A series without data is an HTTP 404, answered here as an empty result saying what was asked.
+// A series without data is an HTTP 404, answered here as an empty result saying what was asked,
+// once SMARD has answered a request (or the grid load's index, which it always has): a 404 from a
+// base URL that reaches no SMARD is an error, never "no data".
 // Ambiguity (a name several series or zones fit) is reported, never guessed.
 
 import type { SmardClient } from "./client.js";
@@ -315,6 +317,61 @@ const round1 = (n: number): number => Math.round(n * 10) / 10;
 
 // --- Shared: reading windows -------------------------------------------------------------------
 
+/** Errors that already say SMARD isn't there: never read as a missing file again. */
+const notThereErrors = new WeakSet<object>();
+
+/**
+ * Tells a file SMARD lacks from a SMARD that isn't there. SMARD answers a series, region,
+ * resolution or window it has no file for with a 404; so does a base URL that reaches no SMARD
+ * (one ending in /app, as the API's docs write the server: the client adds /app itself) or an
+ * error page. Once a request of the use case has had an answer, a 404 is a missing file; before
+ * that, the index of the grid load (410, DE, hour), which SMARD always has, is asked once, and a
+ * 404 for it too is the error, naming the request that failed: never "no data".
+ */
+class Upstream {
+  private answered = false;
+  private check: Promise<void> | undefined;
+
+  constructor(private readonly client: SmardClient) {}
+
+  /** A request had an answer: SMARD is there. */
+  ok(): void {
+    this.answered = true;
+  }
+
+  /**
+   * Resolves when `err` is a 404 for a file SMARD lacks; throws `err` when it is anything else,
+   * and the not-there error when the grid load's index is a 404 too.
+   */
+  async absent(err: unknown, filter: number, region: Region, resolution: Resolution): Promise<void> {
+    if (!(err instanceof SmardApiError) || err.status !== 404 || notThereErrors.has(err)) throw err;
+    if (this.answered) return;
+    const control = (): never => {
+      const notThere = new SmardApiError({
+        status: 404,
+        url: err.url,
+        method: err.method,
+        body: err.body,
+        detail: "the index of the grid load (410, DE, hour), which SMARD always has, is a 404 too: the base URL is wrong (give it without /app; the client adds /app) or SMARD's chart data are not available; this is not a series SMARD lacks",
+      });
+      notThereErrors.add(notThere);
+      throw notThere;
+    };
+    if (filter === CONTROL.filter && region === CONTROL.region && resolution === CONTROL.resolution) control();
+    this.check ??= this.client.timestamps(CONTROL.filter, CONTROL.region, CONTROL.resolution).then(
+      () => this.ok(),
+      (failed: unknown) => {
+        if (failed instanceof SmardApiError && failed.status === 404) control();
+        throw failed;
+      },
+    );
+    await this.check;
+  }
+}
+
+/** The index SMARD always has: the grid load in Germany at hour. */
+const CONTROL = { filter: 410, region: "DE" as Region, resolution: "hour" as Resolution };
+
 /** One series' index and the windows read so far, so a use case reads each file once. */
 class SeriesReader {
   private index: number[] | undefined;
@@ -326,12 +383,22 @@ class SeriesReader {
     readonly filter: number,
     readonly region: Region,
     readonly resolution: Resolution,
+    readonly upstream: Upstream = new Upstream(client),
   ) {}
 
   /** The window starts, oldest first. */
   async starts(): Promise<number[]> {
-    this.index ??= [...(await this.client.timestamps(this.filter, this.region, this.resolution))].sort((a, b) => a - b);
+    if (this.index === undefined) {
+      const index = await this.client.timestamps(this.filter, this.region, this.resolution);
+      this.upstream.ok();
+      this.index = [...index].sort((a, b) => a - b);
+    }
     return this.index;
+  }
+
+  /** Resolves when `err` is a 404 for a file of this series SMARD lacks, else throws (Upstream). */
+  absent(err: unknown): Promise<void> {
+    return this.upstream.absent(err, this.filter, this.region, this.resolution);
   }
 
   /** The points of the window that starts at `start`. */
@@ -339,6 +406,7 @@ class SeriesReader {
     let points = this.windows.get(start);
     if (points === undefined) {
       const file = await this.client.series(this.filter, this.region, this.resolution, start);
+      this.upstream.ok();
       points = [...file.series].sort((a, b) => a[0] - b[0]);
       this.windows.set(start, points);
       this.metas.set(start, file.meta_data);
@@ -387,9 +455,6 @@ class SeriesReader {
     return `chart_data/${this.filter}/${encodeURIComponent(this.region)}/${this.filter}_${encodeURIComponent(this.region)}_${this.resolution}_${window}.json`;
   }
 }
-
-/** SMARD has no file for that series: true for its 404. */
-const isMissing = (err: unknown): boolean => err instanceof SmardApiError && err.status === 404;
 
 /** The empty answer for a series SMARD has no index for. */
 function noSuchSeries(filter: number, region: Region, resolution: Resolution, searched: Record<string, unknown>): Empty {
@@ -497,7 +562,8 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     ended.push({ id, name: info(id).name, note: "Germany's last reactors went offline on 15 April 2023; SMARD's series has no live values since, so it is left out." });
     return false;
   });
-  const readers = new Map([...ids, PUMPED_STORAGE].map((id) => [id, new SeriesReader(client, id, region, resolution)]));
+  const upstream = new Upstream(client);
+  const readers = new Map([...ids, PUMPED_STORAGE].map((id) => [id, new SeriesReader(client, id, region, resolution, upstream)]));
   const reader = (id: number) => readers.get(id) as SeriesReader;
 
   try {
@@ -569,8 +635,8 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
       window,
     };
   } catch (err) {
-    if (isMissing(err)) return noSuchSeries(4067, region, resolution, searched);
-    throw err;
+    await upstream.absent(err, 4067, region, resolution);
+    return noSuchSeries(4067, region, resolution, searched);
   }
 }
 
@@ -676,16 +742,17 @@ export async function getPrices(client: SmardClient, input: PricesInput = {}): P
   const dayPoints = new Map<string, [number, number][]>();
   const currents = new Map<string, [number, number]>();
   let firstWindow: number | undefined;
+  const upstream = new Upstream(client);
   for (const zone of zones) {
-    const reader = new SeriesReader(client, zone.id, "DE-LU", resolution);
+    const reader = new SeriesReader(client, zone.id, "DE-LU", resolution, upstream);
     const result: ZonePrices = { zone: zone.zone ?? String(zone.id), id: zone.id, name: zone.name, nameEn: zone.nameEn, published: false, slots: 0, negativeSlots: 0 };
     results.push(result);
     let starts: number[];
     try {
       starts = await reader.starts();
     } catch (err) {
-      if (isMissing(err)) continue;
-      throw err;
+      await reader.absent(err);
+      continue;
     }
     const newest = starts[starts.length - 1];
     if (newest === undefined) continue;
@@ -850,8 +917,8 @@ export async function getSeries(client: SmardClient, input: SeriesInput): Promis
   try {
     starts = await reader.starts();
   } catch (err) {
-    if (isMissing(err)) return noSuchSeries(id, region, resolution, searched);
-    throw err;
+    await reader.absent(err);
+    return noSuchSeries(id, region, resolution, searched);
   }
   const newest = starts[starts.length - 1];
   if (newest === undefined) return { status: "empty", searched, reason: `SMARD lists no windows for series ${id} in ${region} at ${resolution}.` };
@@ -988,8 +1055,8 @@ export async function listWindows(client: SmardClient, input: { series: string |
   try {
     starts = await reader.starts();
   } catch (err) {
-    if (isMissing(err)) return noSuchSeries(id, region, resolution, searched);
-    throw err;
+    await reader.absent(err);
+    return noSuchSeries(id, region, resolution, searched);
   }
   if (starts.length === 0) return { status: "empty", searched, reason: `SMARD lists no windows for series ${id} in ${region} at ${resolution}.` };
   const windows = [...starts].reverse().map((timestamp) => ({ start: berlinTime(timestamp), label: periodLabel(timestamp, resolution), timestamp }));

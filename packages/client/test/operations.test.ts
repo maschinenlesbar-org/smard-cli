@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { SmardClient } from "../src/client.js";
-import { SmardValidationError } from "../src/errors.js";
+import { SmardApiError, SmardValidationError } from "../src/errors.js";
 import {
   berlinTime,
   fromBerlin,
@@ -23,7 +23,8 @@ import {
   periodLabel,
   resolveRegion,
 } from "../src/operations.js";
-import { SERIES, smardApi, windowPoints, type RecordedSeries, type SeriesOverrides } from "./fixtures.js";
+import { SERIES, smardAnswer, smardApi, windowPoints, type RecordedSeries, type SeriesOverrides } from "./fixtures.js";
+import { makeMockTransport, rawResponse } from "./helpers.js";
 
 function api(overrides: SeriesOverrides = {}) {
   const mock = smardApi(overrides);
@@ -333,4 +334,32 @@ test("listWindows: newest first, with how far back the series goes", async () =>
   assert.equal(windows.oldest, "2015-01-01");
   assert.equal(windows.span, "one calendar year of days");
   assert.equal(windowPoints("410/DE/hour", 1794783600000).length, 168);
+});
+
+// --- A 404 is "no such file" only from a SMARD that is there ---
+
+test("a base URL that reaches no SMARD (every path a 404, an HTML error page) is an error naming both requests, never 'no data'", async () => {
+  // As with --base-url https://www.smard.de/app, which the API's docs list: the client adds /app itself.
+  const page = makeMockTransport(() => rawResponse("<html><body>Seite nicht gefunden – Wartungsarbeiten</body></html>", "text/html", 404));
+  const client = new SmardClient({ transport: page.transport, baseUrl: "https://www.smard.de/app" });
+  const notThere = (err: unknown): boolean =>
+    err instanceof SmardApiError &&
+    err.status === 404 &&
+    /^HTTP 404 for GET https:\/\/www\.smard\.de\/app\/app\/chart_data\//.test(err.message) &&
+    /index of the grid load \(410, DE, hour\), which SMARD always has, is a 404 too/.test(err.message) &&
+    /base URL is wrong/.test(err.message);
+  await assert.rejects(listWindows(client, { series: "410" }), notThere);
+  await assert.rejects(getSeries(client, { series: "Netzlast" }), notThere);
+  await assert.rejects(getPrices(client, { now: NOW }), notThere);
+  await assert.rejects(getGenerationMix(client), notThere);
+  await assert.rejects(listWindows(client, { series: "4068", region: "TenneT" }), notThere);
+});
+
+test("a 404 from a SMARD that answers is a series it lacks: the grid load's index is asked once, and not after another answer", async () => {
+  const { client, mock } = api();
+  const missing = await listWindows(client, { series: 99999 });
+  assert.equal(missing.status, "empty");
+  assert.deepEqual(mock.calls.map((c) => new URL(c.url).pathname), ["/app/chart_data/99999/DE/index_hour.json", "/app/chart_data/410/DE/index_hour.json"]);
+  const control = makeMockTransport((request) => (request.url.includes("/410/DE/index_hour") ? rawResponse("", "text/plain", 500) : smardAnswer(request)));
+  await assert.rejects(listWindows(new SmardClient({ transport: control.transport, maxRetries: 0 }), { series: 99999 }), /HTTP 500/);
 });

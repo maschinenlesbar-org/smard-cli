@@ -79,7 +79,9 @@ calendar: a day starts at 23:00 UTC the day before, so day and longer periods ar
 Berlin date and times carry the Berlin offset. Amounts are MWh per period, prices EUR/MWh
 (wholesale, without grid fees, taxes or levies; they can be negative). A name several series or
 zones fit ("wind", "Dänemark") is reported with the candidates, never guessed; a series SMARD has
-no file for is an empty answer saying what was asked. SMARD publishes one file per series and
+no file for is an empty answer saying what was asked, but a 404 from a base URL that reaches no
+SMARD (one ending in `/app`: the client adds `/app` itself) or from an error page is a tool error:
+the grid load's index (410, DE, hour), which SMARD always has, is asked once to tell them apart. SMARD publishes one file per series and
 week (or year), so getGenerationMix reads 22 files (an index and a window per source), one after the
 other.
 
