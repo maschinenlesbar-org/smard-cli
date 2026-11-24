@@ -66,7 +66,7 @@ For scripts and shared configs, pin a release and its digest from the
 
 | Tool | What it answers |
 |---|---|
-| `getGenerationMix` | Germany's generation by source for one period (the newest settled day by default, or an hour, month or year): each source's energy and share, the total, the renewable and the fossil share; nuclear left out after April 2023, pumped storage apart; a control area's mix from the sources SMARD has for it, the absent ones named. |
+| `getGenerationMix` | Germany's generation by source for one period (the newest settled day by default, or an hour, month or year): each source's energy and share, the total, the renewable and the fossil share; nuclear left out after April 2023, pumped storage apart; a control area's mix from the sources SMARD has for it, the absent ones named; the sources a page, biggest first (under a small `--max-result-chars` the smallest move to the next page; the total and shares count them all). |
 | `getPrices` | The day-ahead price for a Berlin day in one or more bidding zones: the slot running now, the day's low and high with their times, the average, negative slots, the zones ranked; in EUR/MWh and ct/kWh. |
 | `getSeries` | One series over a date range as one ordered list of rows (time, value), the weekly or yearly files stitched, with a CSV header, for a table, chart or export. |
 | `listSeries` | The documented series ids with German and English names, units and kinds, the regions and the resolutions. |

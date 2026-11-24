@@ -747,7 +747,7 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     for (const [id, ts] of newest) if (ts < latest) behind.push({ id, name: info(id).name, newest: periodLabel(ts, resolution), ...(late(ts) ? { stalled: true } : {}) });
   }
 
-  if (!ids.includes(NUCLEAR) && !NO_NUCLEAR.has(region)) ended.push({ id: NUCLEAR, name: info(NUCLEAR).name, note: "Germany's last reactors went offline on 15 April 2023; SMARD's series has no live values since, so it is left out." });
+  if (!ids.includes(NUCLEAR) && !NO_NUCLEAR.has(region)) ended.push({ id: NUCLEAR, name: info(NUCLEAR).name, note: "Left out: Germany's last reactors went offline on 15 April 2023." });
   const sources: MixSource[] = [];
   const missing: GenerationMix["missing"] = [];
   const valueAt = async (id: number): Promise<number | null> => {
@@ -783,7 +783,7 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
   if (at !== undefined && spanned !== undefined && nextPeriod(target, resolution) < at.end) {
     notes.push(`${input.at} spans more than one ${resolution}: this is its first, ${label}. For all of it, ask with resolution ${spanned}.`);
   }
-  notes.push(`Values are energy over the ${resolution} in MWh (1 TWh = 1,000,000 MWh). Pumped storage is storage, not generation: not in the total.`);
+  notes.push(`Energy over the ${resolution} in MWh (1 TWh = 1,000,000 MWh); pumped storage is storage, not in the total.`);
   const window = windows.filter((start) => start <= target).pop() ?? target;
   return {
     status: "ok",

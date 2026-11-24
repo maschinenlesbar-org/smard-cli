@@ -200,3 +200,27 @@ test("the deadline's and the size cap's advice fit every tool: each option named
     }
   }
 });
+
+test("getGenerationMix under a small size cap answers its biggest sources with the whole total and shares, not an error", async () => {
+  for (const cap of [1300, 1200]) {
+    const connection = await connect({ transport: smardApi(), config: { maxResultChars: cap } });
+    const result = await connection.call("getGenerationMix", {});
+    await connection.close();
+    assert.notEqual(result.isError, true, `${cap}: ${result.content[0]?.text}`);
+    assert.ok((result.content[0]?.text.length ?? 0) <= cap);
+    const content = result.structuredContent ?? {};
+    assert.equal(content["status"], "ok");
+    assert.equal(content["truncated"], true);
+    assert.equal(content["renewableShare"], 77.1, "the shares count every source");
+    assert.equal(content["totalMWh"], 1676916.19);
+    const sources = content["sources"] as { name: string }[];
+    assert.equal(sources[0]?.name, "Wind Onshore", "the biggest first");
+    assert.equal(content["total"], 10);
+    assert.equal(content["nextOffset"], sources.length, "the smaller sources are the next page");
+  }
+  const connection = await connect({ transport: smardApi() });
+  const rest = (await connection.call("getGenerationMix", { offset: 8 })).structuredContent ?? {};
+  await connection.close();
+  assert.deepEqual((rest["sources"] as { name: string }[]).map((s) => s.name), ["Wasserkraft", "Sonstige Erneuerbare"]);
+  assert.equal(rest["renewableShare"], 77.1);
+});
