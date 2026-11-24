@@ -158,6 +158,16 @@ test("a period not published yet is empty, saying so; a region without the serie
   if (tennet.status === "empty") assert.match(tennet.reason, /SMARD publishes none of the generation series for region TenneT at resolution day \(HTTP 404\)/);
 });
 
+test("a period after the newest file is not published yet, named as asked: never another period's answer", async () => {
+  for (const at of ["2027-03-01", "2030-06-01"]) {
+    const mix = await getGenerationMix(api().client, { at });
+    assert.equal(mix.status, "empty");
+    if (mix.status !== "empty") continue;
+    assert.match(mix.reason, new RegExp(`Nothing published for ${at} at resolution day in region DE yet`));
+    assert.doesNotMatch(mix.reason, /2026-12-31/);
+  }
+});
+
 /** The recorded DE day series of `ids` as region `region`'s. */
 function asRegion(region: string, ids: number[]): SeriesOverrides {
   return Object.fromEntries(ids.map((id) => [`${id}/${region}/day`, SERIES[`${id}/DE/day`]]));

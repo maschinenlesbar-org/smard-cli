@@ -94,6 +94,17 @@ export function periodLabel(ms: number, resolution: Resolution): string {
   return `${f.year}-${pad(f.month)}-${pad(f.day)} ${pad(f.hour)}:${pad(f.minute)}`;
 }
 
+/** Where the period of `resolution` that starts at `ms` ends: the next one's start, in Berlin's calendar. */
+export function nextPeriod(ms: number, resolution: Resolution): number {
+  if (resolution === "quarterhour") return ms + 900_000;
+  if (resolution === "hour") return ms + 3_600_000;
+  const f = berlinFields(ms);
+  if (resolution === "day") return fromBerlin(f.year, f.month, f.day + 1, f.hour, f.minute);
+  if (resolution === "week") return fromBerlin(f.year, f.month, f.day + 7, f.hour, f.minute);
+  if (resolution === "month") return fromBerlin(f.year, f.month + 1, f.day, f.hour, f.minute);
+  return fromBerlin(f.year + 1, f.month, f.day, f.hour, f.minute);
+}
+
 /** A time a caller gave: where it starts and where the period it names ends (exclusive). */
 export interface TimeSpan {
   start: number;
@@ -656,6 +667,11 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     let point: SeriesPoint | undefined;
     for (const id of ids) if (point === undefined) point = await ofSource(id, (r) => r.pointAt(at.start));
     if (point === undefined) return { status: "empty", searched, reason: `SMARD's ${resolution} series start later than ${input.at}: ask for a later period.` };
+    // The newest point at or before `at` is the period holding it only if that period reaches `at`:
+    // after the newest file it is the file's last point, a period the caller never named.
+    if (nextPeriod(point[0], resolution) <= at.start) {
+      return { status: "empty", searched, reason: `Nothing published for ${input.at} at resolution ${resolution} in region ${region} yet: SMARD publishes a period after it ends. Leave out at for the newest settled period.` };
+    }
     target = point[0];
   } else {
     const newest = new Map<number, number>();
