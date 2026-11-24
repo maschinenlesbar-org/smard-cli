@@ -600,6 +600,8 @@ export interface GenerationMix {
   searched: Record<string, unknown>;
   /** The window file the period is in, for `source`. */
   window: number;
+  /** The series whose file of that window was read (the sources, nuclear when it counts, pumped storage; not an absent one), for `source`. */
+  filters: number[];
 }
 
 /**
@@ -738,6 +740,7 @@ export async function getGenerationMix(client: SmardClient, input: GenerationMix
     notes,
     searched,
     window,
+    filters: [...ids, PUMPED_STORAGE].filter((id) => !absent.has(id)),
   };
 }
 

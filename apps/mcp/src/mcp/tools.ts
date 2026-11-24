@@ -98,11 +98,9 @@ function page<T>(items: readonly T[], args: Record<string, unknown>, fallback: n
 
 /** A result without the fields that only made its source. */
 function withoutSourceFields<T extends object>(answer: T): Record<string, unknown> {
-  const { window: _window, filter: _filter, ...rest } = answer as Record<string, unknown>;
+  const { window: _window, filter: _filter, filters: _filters, ...rest } = answer as Record<string, unknown>;
   return rest;
 }
-
-const MIX_FILES = [1223, 4069, 4071, 1227, 4067, 1225, 4068, 4066, 1226, 1228, 4070];
 
 export const TOOLS: readonly ToolDefinition[] = [
   {
@@ -115,10 +113,10 @@ export const TOOLS: readonly ToolDefinition[] = [
     ].join("\n\n"),
     inputSchema: input({ region: region("DE"), resolution: resolution("day"), at: time("The period to read (default: the newest settled one)") }),
     outputSchema: output({ region: str_, resolution: str_, period: obj, unit: str_, totalMWh: num_, renewableShare: num_, fossilShare: num_, nuclearShare: num_, sources: arr, pumpedStorage: obj, ended: arr, missing: arr, absent: arr, behind: arr }),
-    source: sourceFor((args) => filesPath(MIX_FILES, str(args, "region") ?? "DE", str(args, "resolution") ?? "day", ["{window}"])),
+    source: sourceFor((args) => `chart_data/{id}/${encodeURIComponent(str(args, "region") ?? "DE")}/index_${str(args, "resolution") ?? "day"}.json`),
     async run(args, context) {
       const mix = await getGenerationMix(context.client, { region: str(args, "region"), resolution: str(args, "resolution"), at: str(args, "at") });
-      if (mix.status === "ok") requested.set(args, filesPath(MIX_FILES, mix.region, mix.resolution, [mix.window]));
+      if (mix.status === "ok") requested.set(args, filesPath(mix.filters, mix.region, mix.resolution, [mix.window]));
       return withoutSourceFields(mix);
     },
   },

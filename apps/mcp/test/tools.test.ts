@@ -134,3 +134,19 @@ test("getGenerationMix for a control area without some sources answers the other
   assert.deepEqual(content["absent"], [{ id: 1223, name: "Braunkohle" }, { id: 1225, name: "Wind Offshore" }]);
   await connection.close();
 });
+
+test("getGenerationMix cites the files it read: nuclear's when nuclear counts, none of a source SMARD hasn't", async () => {
+  const start = 1672527600000; // 2023-01-01 Berlin
+  const year: Record<string, unknown> = {};
+  for (const id of [1223, 4069, 4071, 1227, 1224, 4067, 1225, 4068, 4066, 1226, 1228, 4070]) year[`${id}/DE/year`] = { index: [start], windows: { [String(start)]: [start, 86_400_000, [100]] } };
+  const connection = await connect({ transport: smardApi(year as never) });
+  const nuclear = (await connection.call("getGenerationMix", { resolution: "year", at: "2023" })).structuredContent ?? {};
+  assert.equal(nuclear["status"], "ok");
+  assert.equal(nuclear["source"], `${BASE}/chart_data/{1223,4069,4071,1227,1224,4067,1225,4068,4066,1226,1228,4070}/DE/{id}_DE_year_${start}.json`);
+  await connection.close();
+  const transnet = Object.fromEntries([4069, 4071, 1227, 4067, 4068, 4066, 1226, 1228, 4070].map((id) => [`${id}/TransnetBW/day`, SERIES[`${id}/DE/day`]]));
+  const bw = await connect({ transport: smardApi(transnet) });
+  const mix = (await bw.call("getGenerationMix", { region: "TransnetBW" })).structuredContent ?? {};
+  assert.equal(mix["source"], `${BASE}/chart_data/{4069,4071,1227,4067,4068,4066,1226,1228,4070}/TransnetBW/{id}_TransnetBW_day_1767222000000.json`);
+  await bw.close();
+});
