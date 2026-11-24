@@ -165,3 +165,14 @@ test("an empty getSeries or listWindows answer cites the index of the series the
   }
   await connection.close();
 });
+
+test("an offset past the end of the list says so in a note, with how many there are", async () => {
+  const connection = await connect({ transport: smardApi() });
+  const rows = (await connection.call("getSeries", { series: "410", from: "2026-11-14", to: "2026-11-16", offset: 99_999 })).structuredContent ?? {};
+  assert.deepEqual(rows["rows"], []);
+  assert.match((rows["notes"] as string[]).join(" "), /offset 99999 is past the end: there are 72 rows \(offsets 0-71\)/);
+  const windows = (await connection.call("listWindows", { series: "pv", resolution: "day", offset: 12 })).structuredContent ?? {};
+  assert.deepEqual(windows["windows"], []);
+  assert.match((windows["notes"] as string[]).join(" "), /offset 12 is past the end: there are 12 windows \(offsets 0-11\)/);
+  await connection.close();
+});

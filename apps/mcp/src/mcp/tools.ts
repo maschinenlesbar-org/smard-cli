@@ -88,12 +88,13 @@ function filesPath(ids: readonly number[], region_: string, resolution_: string,
 /** The source of `args`' answer: what run recorded, else `fallback`. */
 const sourceFor = (fallback: (args: Record<string, unknown>) => string) => (args: Record<string, unknown>) => requested.get(args) ?? fallback(args);
 
-/** A page of `items`, and where the next one starts. */
-function page<T>(items: readonly T[], args: Record<string, unknown>, fallback: number): { items: T[]; total: number; nextOffset?: number } {
+/** A page of `items`, where the next one starts, and a note when the offset is past the end (`what` names the items). */
+function page<T>(items: readonly T[], args: Record<string, unknown>, fallback: number, what: string): { items: T[]; total: number; nextOffset?: number; note?: string } {
   const from = num(args, "offset") ?? 0;
   const items_ = items.slice(from, from + (num(args, "limit") ?? fallback));
   const next = from + items_.length;
-  return { items: items_, total: items.length, ...(next < items.length ? { nextOffset: next } : {}) };
+  const past = from > 0 && from >= items.length ? `offset ${from} is past the end: there are ${items.length} ${what} (offsets 0-${items.length - 1}).` : undefined;
+  return { items: items_, total: items.length, ...(next < items.length ? { nextOffset: next } : {}), ...(past === undefined ? {} : { note: past }) };
 }
 
 /** Where the documented series are listed: the source of an answer made without a request (a name that fits none or several). */
@@ -186,8 +187,8 @@ export const TOOLS: readonly ToolDefinition[] = [
         return withoutSourceFields(rows);
       }
       requested.set(args, filesPath([rows.series.id], rows.region, rows.resolution, rows.files.map((f) => f.timestamp)));
-      const { items, total, nextOffset } = page(rows.rows, args, 200);
-      return { ...withoutSourceFields(rows), rows: items, total, ...(nextOffset === undefined ? {} : { nextOffset }) };
+      const { items, total, nextOffset, note } = page(rows.rows, args, 200, "rows");
+      return { ...withoutSourceFields(rows), rows: items, total, ...(nextOffset === undefined ? {} : { nextOffset }), ...(note === undefined ? {} : { notes: [note, ...rows.notes] }) };
     },
   },
   {
@@ -227,8 +228,8 @@ export const TOOLS: readonly ToolDefinition[] = [
         return withoutSourceFields(windows);
       }
       requested.set(args, `chart_data/${windows.series.id}/${encodeURIComponent(windows.region)}/index_${windows.resolution}.json`);
-      const { items, total, nextOffset } = page(windows.windows, args, 50);
-      return { ...windows, windows: items, total, ...(nextOffset === undefined ? {} : { nextOffset }) };
+      const { items, total, nextOffset, note } = page(windows.windows, args, 50, "windows");
+      return { ...windows, windows: items, total, ...(nextOffset === undefined ? {} : { nextOffset }), ...(note === undefined ? {} : { notes: [note] }) };
     },
   },
 ];
