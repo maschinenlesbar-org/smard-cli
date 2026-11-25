@@ -38,9 +38,10 @@ export const DEADLINE_HINT =
   "SMARD answered slowly: try again in a minute. A call reads less with fewer zones (getPrices) or a shorter range from or to (getSeries); getGenerationMix reads about 12 files whatever is asked, so only a later try helps there.";
 
 /**
- * An answer over the size cap (the result's, or the 16 MiB a SMARD file may have) says what to ask
- * instead: each option with the tools that take it. The mix's sources are biggest first, and its
- * total and shares count every one, also when the cap cut the list.
+ * An answer over this server's result cap (--max-result-chars) says what to ask instead: each option
+ * with the tools that take it. The mix's sources are biggest first, and its total and shares count
+ * every one, also when the cap cut the list. A SMARD file over the 16 MiB the server reads gets the
+ * kit's own error, which says that narrower options don't help.
  */
 export const SIZE_HINT =
   "Ask for less: from or to (getSeries), resolution (getSeries, listWindows), limit (getSeries, listWindows, getGenerationMix), zones (getPrices). getGenerationMix's sources are biggest first; its total and shares count all.";
